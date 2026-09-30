@@ -156,11 +156,15 @@ export class NetworkNavigator {
 			.attr('width', width)
 			.attr('height', height)
 
+		// forceLink is stored separately from the simulation so we can call
+		// forceLink.links([]) and forceLink.distance/strength without recreating it.
 		this.forceLink = d3
 			.forceLink<any, any>()
 			.distance(10)
 			.strength(2)
 
+		// Simulation is stopped immediately — renderGraph starts it (animated mode)
+		// or drives it manually via tick() (static mode).
 		this.simulation = d3
 			.forceSimulation<any>()
 			.force('link', this.forceLink)
@@ -619,12 +623,17 @@ export class NetworkNavigator {
 		const links: { source: any; target: any }[] = []
 		const bilinks: any[] = []
 
+		// Bilink technique: for each logical edge s→t we insert a hidden intermediate
+		// node `i` and two real force links: s→i and i→t. The SVG line is drawn
+		// from s to t using i's position as an invisible midpoint anchor. This lets
+		// parallel edges between the same two nodes curve without overlapping.
+		// bilinks[k] = [sourceNode, intermediateNode, targetNode, edgeWidth, edgeColor]
 		graph.links.forEach(graphLink => {
 			const s = nodes[graphLink.source]
 			const t = nodes[graphLink.target]
 			const w = graphLink.value
 			const cw = graphLink.colorValue
-			const i: any = {} // intermediate node for bilink curve
+			const i: any = {}
 			nodes.push(i)
 			links.push({ source: s, target: i }, { source: i, target: t })
 			bilinks.push([s, i, t, w, cw])
@@ -643,6 +652,8 @@ export class NetworkNavigator {
 	}
 
 	private renderZoom() {
+		// event.transform.k = scale, event.transform.x/y = translate.
+		// We store scale/translate so zoomToViewport() can restore them after a redraw.
 		this.zoom = d3
 			.zoom<SVGSVGElement, unknown>()
 			.scaleExtent([
@@ -667,7 +678,10 @@ export class NetworkNavigator {
 				'transform',
 				`translate(${this.translate}) scale(${this.scale})`,
 			)
-			// Sync the zoom behavior's internal transform state
+			// In D3 v7, zoom.transform() is how you programmatically set the zoom
+			// state. Calling it syncs the behavior's internal __zoom property on the
+			// SVG element so that subsequent user gestures start from the right baseline
+			// rather than snapping back to identity.
 			this.svg.call(
 				this.zoom.transform,
 				d3.zoomIdentity
@@ -806,7 +820,10 @@ export class NetworkNavigator {
 		link: d3.Selection<any, any, any, any>,
 		node: d3.Selection<any, any, any, any>,
 	) {
-		// Run simulation manually until settled or max iterations reached
+		// Static (non-animated) layout: advance the simulation synchronously instead
+		// of letting the internal timer run. alpha() decays each tick; we stop early
+		// if it drops below 0.01 (essentially converged). 150 iterations is a safe
+		// upper bound for typical graph sizes.
 		this.simulation.alpha(1).stop()
 		for (let k = 0; k < 150 && this.simulation.alpha() > 1e-2; k++) {
 			this.simulation.tick()

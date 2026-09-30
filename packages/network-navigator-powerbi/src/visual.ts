@@ -122,6 +122,9 @@ export class Visual implements IVisual {
 	}
 
 	public update(options: VisualUpdateOptions) {
+		// Power BI calls update() for every interaction, resize, and data change.
+		// DATA_RESIZE handles viewport changes only (avoids re-parsing the dataView).
+		// DATA_CHANGED_TYPES handles new data, format pane changes, and full refreshes.
 		const dataView =
 			options.dataViews &&
 			options.dataViews.length &&
@@ -164,7 +167,10 @@ export class Visual implements IVisual {
 				}
 			}
 
-			// Inbound cross-highlight: apply highlights sent by other visuals
+			// Inbound cross-highlight: Power BI populates dataView.table.highlights
+			// when another visual makes a selection and this visual has
+			// supportsHighlight:true in capabilities.json. The array is parallel to
+			// table.rows — a null entry means that row is NOT highlighted.
 			const tableHighlights = (dataView?.table as any)
 				?.highlights as powerbi.PrimitiveValue[][] | undefined
 			if (tableHighlights) {
@@ -277,9 +283,16 @@ export class Visual implements IVisual {
 	}
 
 	/**
-	 * Inbound cross-highlight: called when the DataView contains highlight data
-	 * sent by another visual via supportsHighlight. Maps highlighted row indices
-	 * to node names and dims all non-highlighted nodes.
+	 * Inbound cross-highlight via supportsHighlight.
+	 *
+	 * Power BI passes a highlights array parallel to table.rows. Each entry is an
+	 * array of column values — null means the column is NOT part of the highlight.
+	 * converter.ts stores rowIndices on each node, so we can invert: highlighted
+	 * rows → node names → dim everything else.
+	 *
+	 * This is the preferred inbound path because Power BI does the cross-visual
+	 * mapping for us (it knows which rows in our table correspond to the selection
+	 * made in the other visual, even if they don't share identity columns).
 	 */
 	private applyHighlights(highlights: powerbi.PrimitiveValue[][]) {
 		const nodes = this._currentGraphData?.nodes
@@ -310,9 +323,13 @@ export class Visual implements IVisual {
 	}
 
 	/**
-	 * Inbound cross-highlight: called by registerOnSelectCallback when another visual
-	 * makes a selection via SelectionManager. Matches incoming IDs to our node identities
-	 * and dims non-matching nodes.
+	 * Inbound cross-highlight via registerOnSelectCallback.
+	 *
+	 * Power BI calls this when another visual makes a selection via its own
+	 * SelectionManager. We match by ISelectionId.getKey() which is a stable
+	 * string key. This path is best-effort: it only works when both visuals
+	 * built their IDs from the same underlying table/column. When it can't match
+	 * any node (different data source), we clear rather than dimming everything.
 	 */
 	private handleExternalSelection(ids: powerbi.visuals.ISelectionId[]) {
 		if (!ids || ids.length === 0) {
@@ -323,10 +340,8 @@ export class Visual implements IVisual {
 		const nodes = this._currentGraphData?.nodes
 		if (!nodes?.length) return
 
-		// Build a lookup of incoming selection key → true
 		const incomingKeys = new Set(ids.map(id => id.getKey()))
 
-		// Find nodes whose identity key matches any of the incoming IDs
 		const matchedNames = new Set<string>()
 		nodes.forEach(n => {
 			if (n.identity && incomingKeys.has(n.identity.getKey())) {
