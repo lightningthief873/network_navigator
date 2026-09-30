@@ -2,7 +2,7 @@
 	"name": "@essex/network-navigator",
 	"version": "3.0.0",
 	"description": "",
-	"main": "src/index.ts",
+	"main": "dist/index.js",
 	"publishConfig": {
 		"main": "dist/index.js",
 		"types": "dist/index.d.ts"
@@ -10,6 +10,7 @@
 	"author": "Microsoft",
 	"license": "MIT",
 	"scripts": {
+		"build": "tsc -p tsconfig.json",
 		"clean": "essex clean",
 		"lint": "tslint -c tslint.json -p tsconfig.json",
 		"test": "karma start"

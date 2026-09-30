@@ -30,4 +30,10 @@ export interface INetworkNavigatorSelectableNode extends INetworkNavigatorNode {
 	 * The identity of the node
 	 */
 	identity: powerbi.visuals.ISelectionId
+
+	/**
+	 * The row indices in the DataView table that contain this node (as source or target).
+	 * Used to map external cross-highlight signals back to nodes.
+	 */
+	rowIndices: number[]
 }

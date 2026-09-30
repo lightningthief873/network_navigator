@@ -52,6 +52,12 @@ export interface INetworkNavigatorNode {
 	 * Whether or not the given node is selected
 	 */
 	selected: boolean
+
+	/**
+	 * Whether this node is dimmed due to an external cross-highlight selection
+	 * (another visual has highlighted something that does not include this node)
+	 */
+	dimmed?: boolean
 }
 
 /**

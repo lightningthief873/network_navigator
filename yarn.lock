@@ -1609,8 +1609,8 @@ __metadata:
     jquery: ^3.6.0
     less-loader: ^11.0.0
     lodash-es: ^4.17.21
-    powerbi-models: ^1.10.5
-    powerbi-visuals-api: ~3.8.0
+    powerbi-models: ^2.2.0
+    powerbi-visuals-api: ~5.11.1
     powerbi-visuals-utils-testutils: 2.4.1
     style-loader: ^3.3.1
     ts-loader: 9.3.0
@@ -9700,19 +9700,19 @@ __metadata:
   languageName: node
   linkType: hard
 
-"powerbi-models@npm:^1.10.5":
-  version: 1.10.5
-  resolution: "powerbi-models@npm:1.10.5"
-  checksum: 973901824175f35aed80cd4ef2e04cfaffd883fe09cba4f9f3a5345710229a0f58bfdc24cd930af70bf9da9fe246748fa1321bf69ac193bed5dbbd45a5252db3
+"powerbi-models@npm:^2.2.0":
+  version: 2.2.0
+  resolution: "powerbi-models@npm:2.2.0"
+  checksum: fd709d2391b584ed7ff97ae1e6a2167ff5702fd8bce0601e162caa8e83b42b37f1f5d7094d2ca373943e48756db969265601e8be72edb90c53618e0ca4f327c2
   languageName: node
   linkType: hard
 
-"powerbi-visuals-api@npm:~3.8.0":
-  version: 3.8.4
-  resolution: "powerbi-visuals-api@npm:3.8.4"
+"powerbi-visuals-api@npm:~5.11.1":
+  version: 5.11.1
+  resolution: "powerbi-visuals-api@npm:5.11.1"
   dependencies:
-    semver: ^7.3.5
-  checksum: e84833ad1faf939a25765d14ea0022c671df8842e6498f2b646d8d2a667603f61666c4b59de03865ff327caccb5fb801df8cc1cd85c43356ecae1c1038b53b5d
+    semver: ^7.6.0
+  checksum: 7ff327877910e7fb47d489bffe048a914a9063d66472aa92e13ffe2bc1349cb6875d22b17969eff2e4f5cd7ba40cb884e45950dfc98534ace5f3f439ab563201
   languageName: node
   linkType: hard
 
@@ -10685,6 +10685,15 @@ __metadata:
   bin:
     semver: bin/semver.js
   checksum: 2fa3e877568cd6ce769c75c211beaed1f9fce80b28338cadd9d0b6c40f2e2862bafd62c19a6cff42f3d54292b7c623277bcab8816a2b5521cf15210d43e75232
+  languageName: node
+  linkType: hard
+
+"semver@npm:^7.6.0":
+  version: 7.8.5
+  resolution: "semver@npm:7.8.5"
+  bin:
+    semver: bin/semver.js
+  checksum: 0c580f17e88e2b45806dc5cf3d824f719c946999d3554bf30307c2b68b3300ab3c8bfcd84d8f489b93b4cbb5362f5fc8de4d2858954f18d834253c4450fc9f6b
   languageName: node
   linkType: hard
 

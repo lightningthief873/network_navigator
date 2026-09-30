@@ -1,15 +1,20 @@
 {
 	"compilerOptions": {
-	  "allowJs": false,
-	  "emitDecoratorMetadata": true,
-	  "experimentalDecorators": true,
-	  "target": "es6",
-	  "sourceMap": true,
-	  "outDir": "dist",
-	  "moduleResolution": "node",
-	  "resolveJsonModule": true,
-	  "declaration": true,
-	  "lib": ["es2015", "dom"]
-	}
-  }
+		"allowJs": false,
+		"emitDecoratorMetadata": true,
+		"experimentalDecorators": true,
+		"target": "es6",
+		"module": "CommonJS",
+		"sourceMap": true,
+		"outDir": "dist",
+		"moduleResolution": "node",
+		"resolveJsonModule": true,
+		"declaration": true,
+		"lib": ["es2015", "dom"],
+		"allowSyntheticDefaultImports": true,
+		"skipLibCheck": true
+	},
+	"include": ["src/**/*.ts"],
+	"exclude": ["node_modules", "dist"]
+}
   

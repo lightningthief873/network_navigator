@@ -117,6 +117,12 @@ export class NetworkNavigator {
 	private _selectedNode?: INetworkNavigatorNode
 
 	/**
+	 * When set, only these node names are "active"; all others are dimmed.
+	 * Undefined means no external highlight is active (all nodes fully opaque).
+	 */
+	private _highlightedNodeNames?: Set<string>
+
+	/**
 	 * The raw configuration for network navigator
 	 */
 	private _configuration: VisualSettings = new VisualSettings()
@@ -550,6 +556,7 @@ export class NetworkNavigator {
 				.style('fill', (d: any) => d.color)
 				.style('stroke', 'red')
 				.style('stroke-width', (d: any) => (d.selected ? 1 : 0))
+				.style('opacity', (d: any) => (d.dimmed ? 0.2 : 1.0))
 
 			node.on('click', (n: INetworkNavigatorNode) =>
 				this.updateSelection(n),
@@ -604,6 +611,7 @@ export class NetworkNavigator {
 					() => `${this._configuration.layout.fontSizePT}pt`,
 				)
 				.attr('stroke-width', '0.5px')
+				.style('opacity', (d: any) => (d.dimmed ? 0.2 : 1.0))
 				// tslint:disable
 				.style(
 					'display',
@@ -713,6 +721,43 @@ export class NetworkNavigator {
 		this.vis
 			.selectAll('.node circle')
 			.style('stroke-width', (d: any) => (d.selected ? 1 : 0))
+	}
+
+	/**
+	 * Sets highlight mode for bi-directional cross-filtering.
+	 * @param highlightedNodeNames Set of node names that should remain fully opaque.
+	 *   Pass undefined to clear highlight mode (all nodes fully opaque).
+	 */
+	public setHighlightMode(highlightedNodeNames?: Set<string>) {
+		this._highlightedNodeNames = highlightedNodeNames
+		const nodes = this.graph?.nodes
+		if (nodes) {
+			nodes.forEach(n => {
+				n.dimmed =
+					highlightedNodeNames !== undefined &&
+					!!n.name &&
+					!highlightedNodeNames.has(n.name)
+			})
+		}
+		this.redrawHighlights()
+	}
+
+	/**
+	 * Redraws node and label opacity to reflect the current highlight/dim state.
+	 */
+	public redrawHighlights() {
+		this.vis
+			.selectAll('.node circle')
+			.style('opacity', (d: any) => (d.dimmed ? 0.2 : 1.0))
+		this.vis
+			.selectAll('.node .node-label')
+			.style('opacity', (d: any) => (d.dimmed ? 0.2 : 1.0))
+		// Also dim edges where both endpoints are dimmed
+		this.vis
+			.selectAll('.link')
+			.style('opacity', (d: any) =>
+				d[0]?.dimmed && d[2]?.dimmed ? 0.1 : 0.8,
+			)
 	}
 
 	/**

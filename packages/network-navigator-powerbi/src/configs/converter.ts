@@ -105,6 +105,7 @@ function converter(
 				value: nodeWeight,
 				neighbors: 1,
 				selected: false,
+				rowIndices: [],
 				identity: builder
 					? builder
 							.withCategory(
@@ -133,23 +134,29 @@ function converter(
 				//These need to be strings to work properly
 				const sourceId = row[sourceIdx] + ''
 				const targetId = row[targetIdx] + ''
+				const sourceNode = getNode(
+					sourceId,
+					identity,
+					true,
+					<number>row[sourceNodeWeightIdx],
+					<string>row[sourceColorIdx],
+					<string>row[sourceLabelColorIdx],
+				)
+				const targetNode = getNode(
+					targetId,
+					identity,
+					false,
+					<number>row[targetNodeWeightIdx],
+					<string>row[targetColorIdx],
+					<string>row[targetLabelColorIdx],
+				)
+				// Track which DataView rows each node participates in (used for highlight mapping)
+				if (!sourceNode.rowIndices.includes(idx)) sourceNode.rowIndices.push(idx)
+				if (!targetNode.rowIndices.includes(idx)) targetNode.rowIndices.push(idx)
+
 				const edge = <INetworkNavigatorLink>{
-					source: getNode(
-						sourceId,
-						identity,
-						true,
-						<number>row[sourceNodeWeightIdx],
-						<string>row[sourceColorIdx],
-						<string>row[sourceLabelColorIdx],
-					).index,
-					target: getNode(
-						targetId,
-						identity,
-						false,
-						<number>row[targetNodeWeightIdx],
-						<string>row[targetColorIdx],
-						<string>row[targetLabelColorIdx],
-					).index,
+					source: sourceNode.index,
+					target: targetNode.index,
 					value: row[edgeValueIdx],
 					colorValue: row[edgeColorValueIdx],
 				}

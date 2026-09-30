@@ -1,4 +1,6 @@
 {
+	"supportsHighlight": true,
+	"privileges": [],
 	"dataRoles": [
 		{
 			"name": "SOURCE_NODE",

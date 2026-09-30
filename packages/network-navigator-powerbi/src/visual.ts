@@ -91,6 +91,11 @@ export class Visual implements IVisual {
 	private target: JQuery
 	private visualSettings: VisualSettings
 
+	/**
+	 * The last converted graph data, kept so we can map highlights back to nodes
+	 */
+	private _currentGraphData: ReturnType<typeof converter> | undefined
+
 	constructor(options: VisualConstructorOptions) {
 		this.host = options.host
 
@@ -108,6 +113,13 @@ export class Visual implements IVisual {
 			this.target.height(),
 		)
 		this.attachEvents()
+
+		// Inbound: when another visual makes a selection, highlight matching nodes
+		this.selectionManager.registerOnSelectCallback(
+			(ids: powerbi.visuals.ISelectionId[]) => {
+				this.handleExternalSelection(ids)
+			},
+		)
 	}
 
 	public update(options: VisualUpdateOptions) {
@@ -142,13 +154,24 @@ export class Visual implements IVisual {
 						() => this.host.createSelectionIdBuilder(),
 					)
 
+					this._currentGraphData = newData
 					this.networkNavigator.data = newData
 				} else {
+					this._currentGraphData = undefined
 					this.networkNavigator.data = {
 						links: [],
 						nodes: [],
 					}
 				}
+			}
+
+			// Inbound cross-highlight: apply highlights sent by other visuals
+			const tableHighlights = (dataView?.table as any)
+				?.highlights as powerbi.PrimitiveValue[][] | undefined
+			if (tableHighlights) {
+				this.applyHighlights(tableHighlights)
+			} else {
+				this.networkNavigator.setHighlightMode(undefined)
 			}
 		}
 
@@ -223,9 +246,23 @@ export class Visual implements IVisual {
 	}
 
 	/**
-	 * Persists the given node as the seelcted node
+	 * Persists the given node as the selected node.
+	 * Outbound bi-directional: broadcasts both a cross-filter (applyJsonFilter)
+	 * and a cross-highlight (selectionManager.select) to other visuals.
 	 */
 	protected persistNodeSelection(node: INetworkNavigatorSelectableNode) {
+		// Cross-highlight: dims (but doesn't filter) matching data in other visuals
+		if (node && node.identity) {
+			this.selectionManager
+				.select([node.identity], false)
+				.catch((e: unknown) => console.warn('selectionManager.select failed:', e))
+		} else {
+			this.selectionManager
+				.clear()
+				.catch((e: unknown) => console.warn('selectionManager.clear failed:', e))
+		}
+
+		// Cross-filter: actually filters data in other visuals (persistent via capabilities)
 		const filterToApply = node && node.filter
 		let hasConditions = false
 		if (filterToApply && filterToApply['values']) {
@@ -238,6 +275,70 @@ export class Visual implements IVisual {
 			: powerbi.FilterAction.remove
 
 		this.host.applyJsonFilter(filterToApply, 'general', 'filter', action)
+	}
+
+	/**
+	 * Inbound cross-highlight: called when the DataView contains highlight data
+	 * sent by another visual via supportsHighlight. Maps highlighted row indices
+	 * to node names and dims all non-highlighted nodes.
+	 */
+	private applyHighlights(highlights: powerbi.PrimitiveValue[][]) {
+		const nodes = this._currentGraphData?.nodes
+		if (!nodes?.length) return
+
+		// A row is "highlighted" if at least one column value is non-null
+		const highlightedRows = new Set<number>()
+		highlights.forEach((rowHighlights, rowIdx) => {
+			if (rowHighlights?.some(v => v !== null)) {
+				highlightedRows.add(rowIdx)
+			}
+		})
+
+		if (highlightedRows.size === 0) {
+			this.networkNavigator.setHighlightMode(undefined)
+			return
+		}
+
+		// Map highlighted rows back to node names via the rowIndices stored on each node
+		const highlightedNodeNames = new Set<string>()
+		nodes.forEach(n => {
+			if (n.rowIndices.some(idx => highlightedRows.has(idx))) {
+				highlightedNodeNames.add(n.name)
+			}
+		})
+
+		this.networkNavigator.setHighlightMode(highlightedNodeNames)
+	}
+
+	/**
+	 * Inbound cross-highlight: called by registerOnSelectCallback when another visual
+	 * makes a selection via SelectionManager. Matches incoming IDs to our node identities
+	 * and dims non-matching nodes.
+	 */
+	private handleExternalSelection(ids: powerbi.visuals.ISelectionId[]) {
+		if (!ids || ids.length === 0) {
+			this.networkNavigator.setHighlightMode(undefined)
+			return
+		}
+
+		const nodes = this._currentGraphData?.nodes
+		if (!nodes?.length) return
+
+		// Build a lookup of incoming selection key → true
+		const incomingKeys = new Set(ids.map(id => id.getKey()))
+
+		// Find nodes whose identity key matches any of the incoming IDs
+		const matchedNames = new Set<string>()
+		nodes.forEach(n => {
+			if (n.identity && incomingKeys.has(n.identity.getKey())) {
+				matchedNames.add(n.name)
+			}
+		})
+
+		// Only apply dimming if at least one node matched; otherwise clear
+		this.networkNavigator.setHighlightMode(
+			matchedNames.size > 0 ? matchedNames : undefined,
+		)
 	}
 
 	/**
