@@ -1,5 +1,3 @@
-/// <reference types="jquery" />
-/// <reference types="jquery" />
 import { VisualSettings } from './VisualSettings';
 import EventEmitter from './base/EventEmitter';
 import type { INetworkNavigatorData, INetworkNavigatorNode } from './interfaces';
@@ -24,7 +22,7 @@ export declare class NetworkNavigator {
      */
     private element;
     /**
-     * A div to containg the svg
+     * A div containing the svg
      */
     private svgContainer;
     /**
@@ -32,17 +30,21 @@ export declare class NetworkNavigator {
      */
     private svg;
     /**
-     * The main visual element
+     * The main visual group inside the svg
      */
     private vis;
     /**
-     * The force graph reference
+     * The D3 force simulation (replaces D3 v3 force layout)
      */
-    private force;
+    private simulation;
     /**
-     * The d3 zoom behavior
+     * The forceLink force — stored separately so links can be updated independently
      */
-    private zoom?;
+    private forceLink;
+    /**
+     * The D3 zoom behavior
+     */
+    private zoom;
     /**
      * The raw graph data given to network navigator
      */
@@ -56,21 +58,20 @@ export declare class NetworkNavigator {
      */
     private _selectedNode?;
     /**
+     * The raw configuration for network navigator
+     */
+    private _configuration;
+    /**
      * When set, only these node names are "active"; all others are dimmed.
      * Undefined means no external highlight is active (all nodes fully opaque).
      */
     private _highlightedNodeNames?;
     /**
-     * The raw configuration for network navigator
-     */
-    private _configuration;
-    /**
      * Constructor for the network navigator
      */
-    constructor(element: JQuery, width?: number, height?: number);
+    constructor(element: HTMLElement, width?: number, height?: number);
     /**
      * Sets the current text filter
-     * @param value The value of the text filter
      */
     set textFilter(value: string);
     /**
@@ -93,7 +94,6 @@ export declare class NetworkNavigator {
     get configuration(): VisualSettings;
     /**
      * Setter for the configuration
-     * @param newConfig The new configuration to set
      */
     set configuration(newConfig: VisualSettings);
     /**
@@ -151,11 +151,10 @@ export declare class NetworkNavigator {
     filterNodes(text: string, animate?: boolean): void;
     /**
      * Updates the selection based on the given node
-     * @param n The node to update selection for
      */
     updateSelection(n?: INetworkNavigatorNode): void;
     /**
-     * Reflows the given links and nodes
+     * Reflows the given links and nodes using manual simulation ticks (no animation timer)
      */
     private reflow;
     private createConnections;

@@ -25,49 +25,34 @@
  */
 
 /**
- * The template for the network navigator
+ * The template for the network navigator — vanilla DOM, no jQuery
  */
-import * as $ from 'jquery'
-
 export class GraphElement {
-	private element: JQuery
+	private _root: HTMLElement
+
 	constructor() {
-		this.element = $(this.template())
+		const div = document.createElement('div')
+		div.innerHTML = `<div class="graph-container"><div class="button-bar"><div class="input-box"><input type="text" autocomplete="off" placeholder="Enter text filter" id="search-filter-box"/><a id="clear-selection"><span class="clear-selection-button"></span></a></div></div><div class="svg-container"></div></div>`
+		this._root = div.firstElementChild as HTMLElement
 	}
 
-	public get graphTemplate(): JQuery {
-		return this.element
-	}
-	public get svgContainer(): JQuery {
-		return this.element.find('.svg-container')
-	}
-	public get clearSelection(): JQuery {
-		return this.element.find('#clear-selection')
+	public get graphTemplate(): HTMLElement {
+		return this._root
 	}
 
-	public get filterBox() {
-		return this.element.find('#search-filter-box')
+	public get svgContainer(): HTMLElement {
+		return this._root.querySelector('.svg-container') as HTMLElement
+	}
+
+	public get clearSelection(): HTMLElement {
+		return this._root.querySelector('#clear-selection') as HTMLElement
+	}
+
+	public get filterBox(): HTMLInputElement {
+		return this._root.querySelector('#search-filter-box') as HTMLInputElement
 	}
 
 	public get textFilter(): string {
-		return <string>this.filterBox.val()
-	}
-	private template(): string {
-		return `
-        <div class="graph-container">
-            <div class="button-bar">
-                <div class="input-box">
-                    <input type="text" autocomplete="off" placeholder="Enter text filter" id="search-filter-box"/>
-                    <a id="clear-selection">
-                        <span class="clear-selection-button"></span>
-                    </a>
-                </div>
-            </div>
-            <div class="svg-container">
-            </div>
-        </div>
-    `
-			.trim()
-			.replace(/[\r\n]/g, '')
+		return this.filterBox?.value ?? ''
 	}
 }

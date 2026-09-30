@@ -27,7 +27,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NetworkNavigator = void 0;
 const d3 = require("d3");
-const $ = require("jquery");
 const debounce_1 = require("lodash-es/debounce");
 const determineDomain_1 = require("./determineDomain");
 const VisualSettings_1 = require("./VisualSettings");
@@ -60,39 +59,41 @@ class NetworkNavigator {
          */
         this._configuration = new VisualSettings_1.VisualSettings();
         this.element = new GraphElement_1.GraphElement();
-        element.append(this.element.graphTemplate);
+        element.appendChild(this.element.graphTemplate);
         this.svgContainer = this.element.svgContainer;
-        this.element.clearSelection.on('click', () => {
+        this.element.clearSelection.addEventListener('click', () => {
             this.textFilter = '';
             this.updateSelection(undefined);
         });
         const handleTextInput = (0, debounce_1.default)(() => {
             this.filterNodes(this.element.textFilter);
         }, 500);
-        this.element.filterBox.on('input', handleTextInput);
+        this.element.filterBox.addEventListener('input', handleTextInput);
         this._dimensions = { width, height };
         this.svg = d3
-            .select(this.svgContainer[0])
+            .select(this.svgContainer)
             .append('svg')
             .attr('width', width)
             .attr('height', height);
-        this.force = d3.layout
-            .force()
-            .linkDistance(10)
-            .linkStrength(2)
-            .gravity(0.1)
-            .charge(-120)
-            .size([width, height]);
+        this.forceLink = d3
+            .forceLink()
+            .distance(10)
+            .strength(2);
+        this.simulation = d3
+            .forceSimulation()
+            .force('link', this.forceLink)
+            .force('charge', d3.forceManyBody().strength(-120))
+            .force('center', d3.forceCenter(width / 2, height / 2))
+            .stop();
         this.vis = this.svg.append('svg:g');
         this.redraw();
     }
     /**
      * Sets the current text filter
-     * @param value The value of the text filter
      */
     set textFilter(value) {
         if (value !== this.element.textFilter) {
-            this.element.filterBox.val(value);
+            this.element.filterBox.value = value;
             this.filterNodes(value);
         }
     }
@@ -111,22 +112,16 @@ class NetworkNavigator {
             width: (newDimensions === null || newDimensions === void 0 ? void 0 : newDimensions.width) || this.dimensions.width,
             height: (newDimensions === null || newDimensions === void 0 ? void 0 : newDimensions.height) || this.dimensions.height,
         };
-        // If we have created the force graph, then size all of our elements
-        if (this.force) {
-            this.force.size([(_a = this.dimensions) === null || _a === void 0 ? void 0 : _a.width, this.dimensions.height]);
-            // this.force.resume()
-            this.element.graphTemplate.css({
-                width: this.dimensions.width,
-                height: this.dimensions.height,
-            });
-            this.svgContainer.css({
-                width: this.dimensions.width,
-                height: this.dimensions.height,
-            });
-            this.svg.attr({
-                width: this.dimensions.width,
-                height: this.dimensions.height,
-            });
+        if (this.simulation) {
+            const { width, height } = this._dimensions;
+            (_a = this.simulation.force('center')) === null || _a === void 0 ? void 0 : _a.x(width / 2).y(height / 2);
+            const style = (el) => {
+                el.style.width = `${width}px`;
+                el.style.height = `${height}px`;
+            };
+            style(this.element.graphTemplate);
+            style(this.svgContainer);
+            this.svg.attr('width', width).attr('height', height);
         }
     }
     /**
@@ -137,43 +132,50 @@ class NetworkNavigator {
     }
     /**
      * Setter for the configuration
-     * @param newConfig The new configuration to set
      */
     set configuration(newConfig) {
-        newConfig = $.extend(true, {}, this._configuration, newConfig);
-        if (this.force) {
+        var _a, _b, _c;
+        if (this.simulation) {
             let runStart = false;
             const getRangeValue = (settingName, name, config) => {
                 const { default: defaultValue, min, max } = config;
                 let newValue = max
                     ? Math.min(newConfig[settingName][name], max)
                     : newConfig[settingName][name];
-                return ((min ? Math.max(newValue, min) : newValue) ||
-                    defaultValue);
+                return ((min ? Math.max(newValue, min) : newValue) || defaultValue);
             };
-            /**
-             * Updates the config value if necessary, and returns true if it was updated
-             */
             const updateForceConfig = (settingName, name, config) => {
                 if (newConfig[settingName][name] !==
                     this._configuration[settingName][name]) {
                     const newValue = getRangeValue(settingName, name, config);
-                    this.force[name](newValue.toString());
                     newConfig[settingName][name] = newValue;
                     return true;
                 }
+                return false;
             };
-            // Bound all of the settings to their appropriate min/maxes
-            runStart =
-                updateForceConfig('layout', 'linkDistance', defaults_1.linkDistance) ||
-                    runStart;
-            runStart =
-                updateForceConfig('layout', 'linkStrength', defaults_1.linkStrength) ||
-                    runStart;
-            runStart = updateForceConfig('layout', 'charge', defaults_1.charge) || runStart;
-            runStart =
-                updateForceConfig('layout', 'gravity', defaults_1.gravity) || runStart;
-            // If the zoom has changed at all, then let the zoom behavior know
+            // Update linkDistance
+            if (updateForceConfig('layout', 'linkDistance', defaults_1.linkDistance)) {
+                this.forceLink.distance(newConfig.layout.linkDistance);
+                runStart = true;
+            }
+            // Update linkStrength
+            if (updateForceConfig('layout', 'linkStrength', defaults_1.linkStrength)) {
+                this.forceLink.strength(newConfig.layout.linkStrength);
+                runStart = true;
+            }
+            // Update charge
+            if (updateForceConfig('layout', 'charge', defaults_1.charge)) {
+                ;
+                (_a = this.simulation.force('charge')) === null || _a === void 0 ? void 0 : _a.strength(newConfig.layout.charge);
+                runStart = true;
+            }
+            // Update gravity (forceCenter strength)
+            if (updateForceConfig('layout', 'gravity', defaults_1.gravity)) {
+                ;
+                (_b = this.simulation.force('center')) === null || _b === void 0 ? void 0 : _b.strength(newConfig.layout.gravity);
+                runStart = true;
+            }
+            // Update zoom extents
             if (((newConfig.layout.minZoom && newConfig.layout.minZoom) !==
                 this._configuration.layout.minZoom ||
                 (newConfig.layout.maxZoom && newConfig.layout.maxZoom) !==
@@ -186,22 +188,24 @@ class NetworkNavigator {
             }
             if (this._configuration.layout.maxNodeCount !==
                 newConfig.layout.maxNodeCount) {
-                const newValue = getRangeValue('layout', 'maxNodeCount', defaults_1.nodeCount);
-                newConfig.layout.maxNodeCount = newValue;
+                newConfig.layout.maxNodeCount = getRangeValue('layout', 'maxNodeCount', defaults_1.nodeCount);
             }
             if (newConfig.layout.animate) {
-                // If we are rerunning start or if we weren't animated, but now we are, then start the force
-                if (false || !this._configuration.layout.animate) {
-                    this.force.start();
+                if (!this._configuration.layout.animate) {
+                    // Transition from static to animated
+                    this.simulation.alpha(1).restart();
+                }
+                else if (runStart) {
+                    this.simulation.alpha(0.3).restart();
                 }
             }
             else {
-                this.force.stop();
+                this.simulation.stop();
                 if (runStart) {
                     this.reflow(this.vis.selectAll('.link'), this.vis.selectAll('.node'));
                 }
             }
-            // Rerender the labels if necessary
+            // Toggle labels visibility
             if (newConfig.layout.labels !== this._configuration.layout.labels) {
                 this.vis
                     .selectAll('.node text')
@@ -209,19 +213,17 @@ class NetworkNavigator {
             }
             if (newConfig.search.caseInsensitive !==
                 this._configuration.search.caseInsensitive) {
-                this.filterNodes(this.element.filterBox.val());
+                this.filterNodes((_c = this.element.filterBox.value) !== null && _c !== void 0 ? _c : '');
             }
-            if (newConfig.layout.fontSizePT !==
-                this._configuration.layout.fontSizePT) {
+            if (newConfig.layout.fontSizePT !== this._configuration.layout.fontSizePT) {
                 newConfig.layout.fontSizePT = newConfig.layout.fontSizePT || 8;
                 this.vis
                     .selectAll('.node text')
-                    .attr('font-size', () => `${newConfig.layout.fontSizePT}pt`);
+                    .attr('font-size', `${newConfig.layout.fontSizePT}pt`);
             }
         }
         this._configuration = newConfig;
         this.events.raiseEvent('visualSettingsChanged', newConfig);
-        this.redraw();
     }
     /**
      * Sets the selected node
@@ -260,38 +262,38 @@ class NetworkNavigator {
             const me = this;
             this.renderZoom();
             const bilinks = this.buildBilinks(this.graph);
-            const drag = d3.behavior
+            // Drag behavior — v7 API: (event, datum) replaces global d3.event
+            const drag = d3
                 .drag()
-                // tslint:disable-line only-arrow-functions
-                .origin((d) => d)
-                // The use of "function" is important to preserve "this"
-                .on('dragstart', function (d) {
-                // Stop the force graph animation while we are dragging, otherwise it causes the graph to
-                // jitter while you drag it
-                ;
-                d3.event.sourceEvent.stopPropagation();
+                .on('start', function (event, d) {
+                event.sourceEvent.stopPropagation();
                 d3.select(this).classed('dragging', true);
-                me.force.stop();
-            })
-                // tslint:disable-next-line
-                .on('drag', function (d) {
-                // While we drag, adjust the dragged node, and tell our node renderer to draw a frame
-                const evt = d3.event;
-                d.px = d.x = evt.x;
-                d.py = d.y = evt.y;
-                tick();
-            })
-                // tslint:disable-line only-arrow-functions
-                .on('dragend', function (d) {
-                d3.select(this).classed('dragging', false);
-                // If we have animation on, then start that beast
                 if (me._configuration.layout.animate) {
-                    me.force.resume();
+                    if (!event.active)
+                        me.simulation.alphaTarget(0.3).restart();
+                }
+                d.fx = d.x;
+                d.fy = d.y;
+            })
+                .on('drag', function (event, d) {
+                d.fx = d.x = event.x;
+                d.fy = d.y = event.y;
+                if (!me._configuration.layout.animate) {
+                    tick();
+                }
+            })
+                .on('end', function (event, d) {
+                d3.select(this).classed('dragging', false);
+                if (me._configuration.layout.animate) {
+                    if (!event.active)
+                        me.simulation.alphaTarget(0);
+                    d.fx = null;
+                    d.fy = null;
                 }
             });
             this.svg.remove();
             this.svg = d3
-                .select(this.svgContainer[0])
+                .select(this.svgContainer)
                 .append('svg')
                 .attr('width', this.dimensions.width)
                 .attr('height', this.dimensions.height)
@@ -300,24 +302,23 @@ class NetworkNavigator {
                 .classed('networkNavigator', true)
                 .call(this.zoom);
             this.vis = this.svg.append('svg:g');
-            // If we have animation on, then start that beast
             if (this._configuration.layout.animate) {
-                this.force.start();
+                this.simulation.alpha(1).restart();
             }
-            const edgeColorWeightDomain = (0, determineDomain_1.determineDomain)(bilinks, b => b[4], this._configuration.layout.minEdgeColorWeight, this._configuration.layout.maxEdgeColorWeight);
-            const edgeWidthDomain = (0, determineDomain_1.determineDomain)(bilinks, b => b[3], this._configuration.layout.minEdgeWeight, this._configuration.layout.maxEdgeWeight);
-            const edgeColorScale = d3.scale
-                .linear()
+            const edgeColorWeightDomain = (0, determineDomain_1.determineDomain)(bilinks, (b) => b[4], this._configuration.layout.minEdgeColorWeight, this._configuration.layout.maxEdgeColorWeight);
+            const edgeWidthDomain = (0, determineDomain_1.determineDomain)(bilinks, (b) => b[3], this._configuration.layout.minEdgeWeight, this._configuration.layout.maxEdgeWeight);
+            // D3 v7: d3.scaleLinear() replaces d3.scale.linear()
+            const edgeColorScale = d3
+                .scaleLinear()
                 .domain(edgeColorWeightDomain)
-                .interpolate(d3.interpolateRgb)
                 .range([
                 this._configuration.layout.edgeStartColor,
                 this._configuration.layout.edgeEndColor,
-            ]);
-            const edgeWidthScale = d3.scale
-                .linear()
+            ])
+                .interpolate(d3.interpolateRgb);
+            const edgeWidthScale = d3
+                .scaleLinear()
                 .domain(edgeWidthDomain)
-                .interpolate(d3.interpolateNumber)
                 .range([
                 this._configuration.layout.edgeMinWidth,
                 this._configuration.layout.edgeMaxWidth,
@@ -349,20 +350,11 @@ class NetworkNavigator {
                 .enter()
                 .append('line')
                 .attr('class', 'link')
-                // tslint:disable-next-line
-                .style('stroke', function (d) {
-                return xform(d[4], edgeColorScale, edgeColorWeightDomain, 'gray');
-            })
-                // tslint:disable-next-line
-                .style('stroke-width', function (d) {
-                return xform(d[3], edgeWidthScale, edgeWidthDomain, defaults_1.DEFAULT_EDGE_SIZE);
-            })
-                // tslint:disable-next-line
-                .attr('id', function (d) {
-                return (d[0].name.replace(/\./g, '_').replace(/@/g, '_') +
-                    '_' +
-                    d[2].name.replace(/\./g, '_').replace(/@/g, '_'));
-            });
+                .style('stroke', (d) => xform(d[4], edgeColorScale, edgeColorWeightDomain, 'gray'))
+                .style('stroke-width', (d) => xform(d[3], edgeWidthScale, edgeWidthDomain, defaults_1.DEFAULT_EDGE_SIZE))
+                .attr('id', (d) => d[0].name.replace(/\./g, '_').replace(/@/g, '_') +
+                '_' +
+                d[2].name.replace(/\./g, '_').replace(/@/g, '_'));
             const node = this.vis
                 .selectAll('.node')
                 .data(graph.nodes)
@@ -373,69 +365,69 @@ class NetworkNavigator {
             node.append('svg:circle')
                 .attr('r', (d) => {
                 let width = d.value;
-                // tslint:disable
                 if (typeof width === 'undefined' || width === null) {
-                    // tslint:enable
                     width = defaults_1.DEFAULT_NODE_SIZE;
                 }
                 const maxSize = this._configuration.layout.maxNodeSize;
                 const minSize = this._configuration.layout.minNodeSize;
                 width = maxSize && width > maxSize ? maxSize : width;
                 width = minSize && width < minSize ? minSize : width;
-                // Make sure > 0
                 return width > 0 ? width : 0;
             })
                 .style('fill', (d) => d.color)
                 .style('stroke', 'red')
                 .style('stroke-width', (d) => (d.selected ? 1 : 0))
                 .style('opacity', (d) => (d.dimmed ? 0.2 : 1.0));
-            node.on('click', (n) => this.updateSelection(n));
-            node.on('mouseover', () => {
-                // tslint:disable
-                d3.select(this.svgContainer.find('svg text')[0]).style('display', null);
-                // tslint:enable
+            // D3 v7: event is first argument, datum is second
+            node.on('click', (_event, n) => this.updateSelection(n));
+            node.on('mouseover', (_event, _d) => {
+                const firstText = this.svgContainer.querySelector('svg text');
+                if (firstText) {
+                    ;
+                    firstText.style.display = '';
+                }
             });
-            node.on('mouseout', () => {
+            node.on('mouseout', (_event, _d) => {
                 if (!this._configuration.layout.labels) {
-                    d3.select(this.svgContainer.find('svg text')[0]).style('display', 'none');
+                    const firstText = this.svgContainer.querySelector('svg text');
+                    if (firstText) {
+                        ;
+                        firstText.style.display = 'none';
+                    }
                 }
             });
             link.append('svg:text')
-                .text((d) => 'yes')
+                .text(() => 'yes')
                 .attr('fill', 'black')
                 .attr('stroke', 'black')
-                .attr('font-size', () => `${this._configuration.layout.fontSizePT}pt`)
+                .attr('font-size', `${this._configuration.layout.fontSizePT}pt`)
                 .attr('stroke-width', '0.5px')
                 .attr('class', 'linklabel')
                 .attr('text-anchor', 'middle');
             node.append('svg:text')
                 .attr('class', 'node-label')
                 .text((d) => d.name)
-                .attr('fill', (d) => d.labelColor ||
-                this._configuration.layout.defaultLabelColor)
-                .attr('stroke', (d) => d.labelColor ||
-                this._configuration.layout.defaultLabelColor)
-                .attr('font-size', () => `${this._configuration.layout.fontSizePT}pt`)
+                .attr('fill', (d) => d.labelColor || this._configuration.layout.defaultLabelColor)
+                .attr('stroke', (d) => d.labelColor || this._configuration.layout.defaultLabelColor)
+                .attr('font-size', `${this._configuration.layout.fontSizePT}pt`)
                 .attr('stroke-width', '0.5px')
                 .style('opacity', (d) => (d.dimmed ? 0.2 : 1.0))
-                // tslint:disable
                 .style('display', this._configuration.layout.labels ? null : 'none');
-            // tslint:enable
-            // If we are not animating, then play the force quickly
             if (!this._configuration.layout.animate) {
                 this.reflow(link, node);
             }
-            // Our tick function, which actually moves the nodes on the svg based on their x/y positions
+            // Tick function: update SVG positions from simulation node x/y
             const tick = () => {
                 if (this._configuration.layout.animate) {
-                    link.attr('x1', d => d[0].x)
-                        .attr('y1', d => d[0].y)
-                        .attr('x2', d => d[2].x)
-                        .attr('y2', d => d[2].y);
+                    link.attr('x1', (d) => d[0].x)
+                        .attr('y1', (d) => d[0].y)
+                        .attr('x2', (d) => d[2].x)
+                        .attr('y2', (d) => d[2].y);
                     node.attr('transform', (d) => `translate(${d.x},${d.y})`);
                 }
             };
-            this.force.on('tick', tick);
+            // D3 v7: 'tick' fires on the simulation object, not the force layout
+            this.simulation.on('tick', tick);
         }
     }
     buildBilinks(graph) {
@@ -447,12 +439,14 @@ class NetworkNavigator {
             const t = nodes[graphLink.target];
             const w = graphLink.value;
             const cw = graphLink.colorValue;
-            const i = {}; // intermediate node
+            const i = {}; // intermediate node for bilink curve
             nodes.push(i);
             links.push({ source: s, target: i }, { source: i, target: t });
             bilinks.push([s, i, t, w, cw]);
         });
-        this.force.nodes(nodes).links(links);
+        // D3 v7: set nodes on simulation, links on forceLink
+        this.simulation.nodes(nodes);
+        this.forceLink.links(links);
         return bilinks;
     }
     resetZoom() {
@@ -461,27 +455,30 @@ class NetworkNavigator {
         this.zoomToViewport();
     }
     renderZoom() {
-        this.zoom = d3.behavior
+        this.zoom = d3
             .zoom()
             .scaleExtent([
             this._configuration.layout.minZoom,
             this._configuration.layout.maxZoom,
         ])
-            .on('zoom', () => {
-            const event = d3.event;
-            this.scale = event.scale;
-            this.translate = event.translate;
-            this.zoomToViewport();
+            .on('zoom', (event) => {
+            this.scale = event.transform.k;
+            this.translate = [event.transform.x, event.transform.y];
+            if (this.vis) {
+                this.vis.attr('transform', event.transform.toString());
+            }
         });
     }
     /**
      * Applies the current scale and translate settings to the view.
      */
     zoomToViewport() {
-        if (this.zoom && this.vis) {
+        if (this.zoom && this.vis && this.svg) {
             this.vis.attr('transform', `translate(${this.translate}) scale(${this.scale})`);
-            this.zoom.scale(this.scale);
-            this.zoom.translate(this.translate);
+            // Sync the zoom behavior's internal transform state
+            this.svg.call(this.zoom.transform, d3.zoomIdentity
+                .translate(this.translate[0], this.translate[1])
+                .scale(this.scale));
         }
     }
     /**
@@ -534,7 +531,6 @@ class NetworkNavigator {
         this.vis
             .selectAll('.node .node-label')
             .style('opacity', (d) => (d.dimmed ? 0.2 : 1.0));
-        // Also dim edges where both endpoints are dimmed
         this.vis
             .selectAll('.link')
             .style('opacity', (d) => { var _a, _b; return ((_a = d[0]) === null || _a === void 0 ? void 0 : _a.dimmed) && ((_b = d[2]) === null || _b === void 0 ? void 0 : _b.dimmed) ? 0.1 : 0.8; });
@@ -545,10 +541,8 @@ class NetworkNavigator {
     redrawLabels() {
         this.vis
             .selectAll('.node .node-label')
-            .attr('fill', (d) => d.labelColor ||
-            this._configuration.layout.defaultLabelColor)
-            .attr('stroke', (d) => d.labelColor ||
-            this._configuration.layout.defaultLabelColor);
+            .attr('fill', (d) => d.labelColor || this._configuration.layout.defaultLabelColor)
+            .attr('stroke', (d) => d.labelColor || this._configuration.layout.defaultLabelColor);
     }
     /**
      * Filters the nodes to the given string
@@ -560,7 +554,6 @@ class NetworkNavigator {
         }
         const pretty = (val) => (val || '') + '';
         temp.attr('transform', (d) => {
-            // If the node matches the search string, then scale it
             let scale = 1;
             const searchStr = d.name || '';
             const flags = this._configuration.search.caseInsensitive ? 'i' : '';
@@ -573,7 +566,6 @@ class NetworkNavigator {
     }
     /**
      * Updates the selection based on the given node
-     * @param n The node to update selection for
      */
     updateSelection(n) {
         let selectedNode = n;
@@ -586,7 +578,7 @@ class NetworkNavigator {
             }
         }
         else {
-            // Toggle the selected node
+            // Toggle: clicking the already-selected node deselects it
             if (this._selectedNode) {
                 this._selectedNode.selected = false;
             }
@@ -596,17 +588,14 @@ class NetworkNavigator {
         this.events.raiseEvent('selectionChanged', this._selectedNode);
     }
     /**
-     * Reflows the given links and nodes
+     * Reflows the given links and nodes using manual simulation ticks (no animation timer)
      */
     reflow(link, node) {
-        let k = 0;
-        this.force.start();
-        // Alpha measures the amount of movement
-        while (this.force.alpha() > 1e-2 && k < 150) {
-            this.force['tick']();
-            k = k + 1;
+        // Run simulation manually until settled or max iterations reached
+        this.simulation.alpha(1).stop();
+        for (let k = 0; k < 150 && this.simulation.alpha() > 1e-2; k++) {
+            this.simulation.tick();
         }
-        this.force.stop();
         this.createConnections(link, node);
     }
     createConnections(link, node) {

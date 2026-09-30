@@ -26,7 +26,6 @@
 'use strict'
 
 import 'core-js/stable'
-import * as $ from 'jquery'
 import powerbi from 'powerbi-visuals-api'
 import converter from './configs/converter'
 import { DATA_ROLES } from './configs/DATA_ROLES'
@@ -48,7 +47,6 @@ import { INetworkNavigatorSelectableNode } from './configs/models'
 const EVENTS_TO_IGNORE =
 	'mousedown mouseup click focus blur input pointerdown pointerup touchstart touchmove touchdown'
 
-const target = '<div style="height: 100%;"></div>'
 // 254 is a Misc type not documented and not explained by powerbi
 const DATA_CHANGED_TYPES = [
 	powerbi.VisualUpdateType.Data,
@@ -88,7 +86,7 @@ export class Visual implements IVisual {
 	 * My network navigator instance
 	 */
 	public networkNavigator: NetworkNavigator
-	private target: JQuery
+	private target: HTMLElement
 	private visualSettings: VisualSettings
 
 	/**
@@ -100,8 +98,9 @@ export class Visual implements IVisual {
 		this.host = options.host
 
 		if (document) {
-			this.target = $(target)
-			options.element.appendChild(this.target[0])
+			this.target = document.createElement('div')
+			this.target.style.height = '100%'
+			options.element.appendChild(this.target)
 		}
 
 		this.selectionManager = this.host.createSelectionManager()
@@ -109,8 +108,8 @@ export class Visual implements IVisual {
 		this.visualSettings = new VisualSettings()
 		this.networkNavigator = new NetworkNavigator(
 			this.target,
-			this.target.width(),
-			this.target.height(),
+			this.target.offsetWidth || 500,
+			this.target.offsetHeight || 500,
 		)
 		this.attachEvents()
 
@@ -192,7 +191,7 @@ export class Visual implements IVisual {
 	 * Destroys the visual
 	 */
 	public destroy() {
-		this.target.empty()
+		this.target.innerHTML = ''
 	}
 
 	/**
@@ -373,9 +372,12 @@ export class Visual implements IVisual {
 			)
 
 			// PowerBI will eat some events, so use this to prevent powerbi from eating them
-			this.target
-				.find('.filter-box input')
-				.on(EVENTS_TO_IGNORE, e => e.stopPropagation())
+			const filterInput = this.target.querySelector('#search-filter-box')
+			if (filterInput) {
+				EVENTS_TO_IGNORE.split(' ').forEach(evt => {
+					filterInput.addEventListener(evt, e => e.stopPropagation())
+				})
+			}
 		}
 	}
 }

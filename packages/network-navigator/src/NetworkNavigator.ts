@@ -25,11 +25,9 @@
  */
 
 import * as d3 from 'd3'
-import * as $ from 'jquery'
 import debounce from 'lodash-es/debounce'
 import { determineDomain } from './determineDomain'
 import { VisualSettings } from './VisualSettings'
-
 import EventEmitter from './base/EventEmitter'
 import {
 	charge,
@@ -77,29 +75,34 @@ export class NetworkNavigator {
 	private element: GraphElement
 
 	/**
-	 * A div to containg the svg
+	 * A div containing the svg
 	 */
-	private svgContainer: JQuery
+	private svgContainer: HTMLElement
 
 	/**
 	 * The svg element of the visualization
 	 */
-	private svg: d3.Selection<any>
+	private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>
 
 	/**
-	 * The main visual element
+	 * The main visual group inside the svg
 	 */
-	private vis: d3.Selection<any>
+	private vis: d3.Selection<SVGGElement, unknown, null, undefined>
 
 	/**
-	 * The force graph reference
+	 * The D3 force simulation (replaces D3 v3 force layout)
 	 */
-	private force: d3.layout.Force<any, any>
+	private simulation: d3.Simulation<any, any>
 
 	/**
-	 * The d3 zoom behavior
+	 * The forceLink force — stored separately so links can be updated independently
 	 */
-	private zoom?: d3.behavior.Zoom<any>
+	private forceLink: d3.ForceLink<any, any>
+
+	/**
+	 * The D3 zoom behavior
+	 */
+	private zoom: d3.ZoomBehavior<SVGSVGElement, unknown>
 
 	/**
 	 * The raw graph data given to network navigator
@@ -117,25 +120,25 @@ export class NetworkNavigator {
 	private _selectedNode?: INetworkNavigatorNode
 
 	/**
+	 * The raw configuration for network navigator
+	 */
+	private _configuration: VisualSettings = new VisualSettings()
+
+	/**
 	 * When set, only these node names are "active"; all others are dimmed.
 	 * Undefined means no external highlight is active (all nodes fully opaque).
 	 */
 	private _highlightedNodeNames?: Set<string>
 
 	/**
-	 * The raw configuration for network navigator
-	 */
-	private _configuration: VisualSettings = new VisualSettings()
-
-	/**
 	 * Constructor for the network navigator
 	 */
-	constructor(element: JQuery, width = 500, height = 500) {
+	constructor(element: HTMLElement, width = 500, height = 500) {
 		this.element = new GraphElement()
-		element.append(this.element.graphTemplate)
+		element.appendChild(this.element.graphTemplate)
 
 		this.svgContainer = this.element.svgContainer
-		this.element.clearSelection.on('click', () => {
+		this.element.clearSelection.addEventListener('click', () => {
 			this.textFilter = ''
 			this.updateSelection(undefined)
 		})
@@ -144,32 +147,37 @@ export class NetworkNavigator {
 			this.filterNodes(this.element.textFilter)
 		}, 500)
 
-		this.element.filterBox.on('input', handleTextInput)
+		this.element.filterBox.addEventListener('input', handleTextInput)
 		this._dimensions = { width, height }
+
 		this.svg = d3
-			.select(this.svgContainer[0])
+			.select(this.svgContainer)
 			.append('svg')
 			.attr('width', width)
 			.attr('height', height)
 
-		this.force = d3.layout
-			.force()
-			.linkDistance(10)
-			.linkStrength(2)
-			.gravity(0.1)
-			.charge(-120)
-			.size([width, height])
+		this.forceLink = d3
+			.forceLink<any, any>()
+			.distance(10)
+			.strength(2)
+
+		this.simulation = d3
+			.forceSimulation<any>()
+			.force('link', this.forceLink)
+			.force('charge', d3.forceManyBody<any>().strength(-120))
+			.force('center', d3.forceCenter<any>(width / 2, height / 2))
+			.stop()
+
 		this.vis = this.svg.append('svg:g')
 		this.redraw()
 	}
 
 	/**
 	 * Sets the current text filter
-	 * @param value The value of the text filter
 	 */
 	public set textFilter(value: string) {
 		if (value !== this.element.textFilter) {
-			this.element.filterBox.val(value)
+			this.element.filterBox.value = value
 			this.filterNodes(value)
 		}
 	}
@@ -190,22 +198,19 @@ export class NetworkNavigator {
 			height: newDimensions?.height || this.dimensions.height,
 		}
 
-		// If we have created the force graph, then size all of our elements
-		if (this.force) {
-			this.force.size([this.dimensions?.width, this.dimensions.height])
-			// this.force.resume()
-			this.element.graphTemplate.css({
-				width: this.dimensions.width,
-				height: this.dimensions.height,
-			})
-			this.svgContainer.css({
-				width: this.dimensions.width,
-				height: this.dimensions.height,
-			})
-			this.svg.attr({
-				width: this.dimensions.width,
-				height: this.dimensions.height,
-			})
+		if (this.simulation) {
+			const { width, height } = this._dimensions
+			;(this.simulation.force('center') as d3.ForceCenter<any>)
+				?.x(width / 2)
+				.y(height / 2)
+
+			const style = (el: HTMLElement) => {
+				el.style.width = `${width}px`
+				el.style.height = `${height}px`
+			}
+			style(this.element.graphTemplate)
+			style(this.svgContainer)
+			this.svg.attr('width', width).attr('height', height)
 		}
 	}
 
@@ -218,11 +223,9 @@ export class NetworkNavigator {
 
 	/**
 	 * Setter for the configuration
-	 * @param newConfig The new configuration to set
 	 */
 	public set configuration(newConfig: VisualSettings) {
-		newConfig = $.extend(true, {}, this._configuration, newConfig)
-		if (this.force) {
+		if (this.simulation) {
 			let runStart = false
 
 			const getRangeValue = (
@@ -231,50 +234,56 @@ export class NetworkNavigator {
 				config: { default: number; min: number; max: number },
 			): number => {
 				const { default: defaultValue, min, max } = config
-
 				let newValue = max
-					? Math.min(<number>newConfig[settingName][name], max)
-					: newConfig[settingName][name]
+					? Math.min(<number>(newConfig as any)[settingName][name], max)
+					: (newConfig as any)[settingName][name]
 				return (
-					(min ? Math.max(<number>newValue, min) : newValue) ||
-					defaultValue
+					(min ? Math.max(<number>newValue, min) : newValue) || defaultValue
 				)
 			}
 
-			/**
-			 * Updates the config value if necessary, and returns true if it was updated
-			 */
 			const updateForceConfig = (
 				settingName: keyof VisualSettings,
 				name: keyof INetworkNavigatorConfiguration,
 				config: { default: number; min: number; max: number },
 			) => {
 				if (
-					newConfig[settingName][name] !==
-					this._configuration[settingName][name]
+					(newConfig as any)[settingName][name] !==
+					(this._configuration as any)[settingName][name]
 				) {
-					const newValue = getRangeValue(settingName, name, config)
-					this.force[<keyof d3.layout.Force<any, any>>name](
-						<string>newValue.toString(),
-					)
-
-					newConfig[settingName][name] = newValue
+					const newValue = getRangeValue(settingName, name as string, config)
+					;(newConfig as any)[settingName][name] = newValue
 					return true
 				}
+				return false
 			}
 
-			// Bound all of the settings to their appropriate min/maxes
-			runStart =
-				updateForceConfig('layout', 'linkDistance', linkDistance) ||
-				runStart
-			runStart =
-				updateForceConfig('layout', 'linkStrength', linkStrength) ||
-				runStart
-			runStart = updateForceConfig('layout', 'charge', charge) || runStart
-			runStart =
-				updateForceConfig('layout', 'gravity', gravity) || runStart
+			// Update linkDistance
+			if (updateForceConfig('layout', 'linkDistance', linkDistance)) {
+				this.forceLink.distance(newConfig.layout.linkDistance)
+				runStart = true
+			}
+			// Update linkStrength
+			if (updateForceConfig('layout', 'linkStrength', linkStrength)) {
+				this.forceLink.strength(newConfig.layout.linkStrength)
+				runStart = true
+			}
+			// Update charge
+			if (updateForceConfig('layout', 'charge', charge)) {
+				;(this.simulation.force('charge') as d3.ForceManyBody<any>)?.strength(
+					newConfig.layout.charge,
+				)
+				runStart = true
+			}
+			// Update gravity (forceCenter strength)
+			if (updateForceConfig('layout', 'gravity', gravity)) {
+				;(this.simulation.force('center') as d3.ForceCenter<any>)?.strength(
+					newConfig.layout.gravity,
+				)
+				runStart = true
+			}
 
-			// If the zoom has changed at all, then let the zoom behavior know
+			// Update zoom extents
 			if (
 				((newConfig.layout.minZoom && newConfig.layout.minZoom) !==
 					this._configuration.layout.minZoom ||
@@ -292,30 +301,31 @@ export class NetworkNavigator {
 				this._configuration.layout.maxNodeCount !==
 				newConfig.layout.maxNodeCount
 			) {
-				const newValue = getRangeValue(
+				newConfig.layout.maxNodeCount = getRangeValue(
 					'layout',
 					'maxNodeCount',
 					nodeCount,
 				)
-				newConfig.layout.maxNodeCount = newValue
 			}
 
 			if (newConfig.layout.animate) {
-				// If we are rerunning start or if we weren't animated, but now we are, then start the force
-				if (false || !this._configuration.layout.animate) {
-					this.force.start()
+				if (!this._configuration.layout.animate) {
+					// Transition from static to animated
+					this.simulation.alpha(1).restart()
+				} else if (runStart) {
+					this.simulation.alpha(0.3).restart()
 				}
 			} else {
-				this.force.stop()
+				this.simulation.stop()
 				if (runStart) {
 					this.reflow(
-						this.vis.selectAll('.link'),
-						this.vis.selectAll('.node'),
+						this.vis.selectAll<SVGLineElement, any>('.link'),
+						this.vis.selectAll<SVGGElement, any>('.node'),
 					)
 				}
 			}
 
-			// Rerender the labels if necessary
+			// Toggle labels visibility
 			if (newConfig.layout.labels !== this._configuration.layout.labels) {
 				this.vis
 					.selectAll('.node text')
@@ -326,23 +336,21 @@ export class NetworkNavigator {
 				newConfig.search.caseInsensitive !==
 				this._configuration.search.caseInsensitive
 			) {
-				this.filterNodes(<string>this.element.filterBox.val())
+				this.filterNodes(this.element.filterBox.value ?? '')
 			}
 
 			if (
-				newConfig.layout.fontSizePT !==
-				this._configuration.layout.fontSizePT
+				newConfig.layout.fontSizePT !== this._configuration.layout.fontSizePT
 			) {
 				newConfig.layout.fontSizePT = newConfig.layout.fontSizePT || 8
 				this.vis
 					.selectAll('.node text')
-					.attr('font-size', () => `${newConfig.layout.fontSizePT}pt`)
+					.attr('font-size', `${newConfig.layout.fontSizePT}pt`)
 			}
 		}
 
 		this._configuration = newConfig
 		this.events.raiseEvent('visualSettingsChanged', newConfig)
-		this.redraw()
 	}
 
 	/**
@@ -387,40 +395,38 @@ export class NetworkNavigator {
 			this.renderZoom()
 			const bilinks = this.buildBilinks(this.graph)
 
-			const drag = d3.behavior
-				.drag()
-				// tslint:disable-line only-arrow-functions
-				.origin((d: any) => d)
-				// The use of "function" is important to preserve "this"
-				.on('dragstart', function (d: any) {
-					// Stop the force graph animation while we are dragging, otherwise it causes the graph to
-					// jitter while you drag it
-					;(<any>d3.event).sourceEvent.stopPropagation()
+			// Drag behavior — v7 API: (event, datum) replaces global d3.event
+			const drag = d3
+				.drag<SVGGElement, any>()
+				.on('start', function (event: any, d: any) {
+					event.sourceEvent.stopPropagation()
 					d3.select(this).classed('dragging', true)
-					me.force.stop()
-				})
-				// tslint:disable-next-line
-				.on('drag', function (d: any) {
-					// While we drag, adjust the dragged node, and tell our node renderer to draw a frame
-					const evt = <any>d3.event
-					d.px = d.x = evt.x
-					d.py = d.y = evt.y
-					tick()
-				})
-				// tslint:disable-line only-arrow-functions
-				.on('dragend', function (d: any) {
-					d3.select(this).classed('dragging', false)
-
-					// If we have animation on, then start that beast
 					if (me._configuration.layout.animate) {
-						me.force.resume()
+						if (!event.active) me.simulation.alphaTarget(0.3).restart()
+					}
+					d.fx = d.x
+					d.fy = d.y
+				})
+				.on('drag', function (event: any, d: any) {
+					d.fx = d.x = event.x
+					d.fy = d.y = event.y
+					if (!me._configuration.layout.animate) {
+						tick()
+					}
+				})
+				.on('end', function (event: any, d: any) {
+					d3.select(this).classed('dragging', false)
+					if (me._configuration.layout.animate) {
+						if (!event.active) me.simulation.alphaTarget(0)
+						d.fx = null
+						d.fy = null
 					}
 				})
 
 			this.svg.remove()
 
 			this.svg = d3
-				.select(this.svgContainer[0])
+				.select(this.svgContainer)
 				.append('svg')
 				.attr('width', this.dimensions.width)
 				.attr('height', this.dimensions.height)
@@ -428,40 +434,39 @@ export class NetworkNavigator {
 				.attr('pointer-events', 'all')
 				.classed('networkNavigator', true)
 				.call(this.zoom)
-			this.vis = this.svg.append('svg:g')
+			this.vis = this.svg.append<SVGGElement>('svg:g')
 
-			// If we have animation on, then start that beast
 			if (this._configuration.layout.animate) {
-				this.force.start()
+				this.simulation.alpha(1).restart()
 			}
 
 			const edgeColorWeightDomain = determineDomain(
 				bilinks,
-				b => b[4],
+				(b: any) => b[4],
 				this._configuration.layout.minEdgeColorWeight,
 				this._configuration.layout.maxEdgeColorWeight,
 			)
 
 			const edgeWidthDomain = determineDomain(
 				bilinks,
-				b => b[3],
+				(b: any) => b[3],
 				this._configuration.layout.minEdgeWeight,
 				this._configuration.layout.maxEdgeWeight,
 			)
 
-			const edgeColorScale = d3.scale
-				.linear()
+			// D3 v7: d3.scaleLinear() replaces d3.scale.linear()
+			const edgeColorScale = d3
+				.scaleLinear<string>()
 				.domain(edgeColorWeightDomain)
-				.interpolate(<any>d3.interpolateRgb)
-				.range(<any>[
+				.range([
 					this._configuration.layout.edgeStartColor,
 					this._configuration.layout.edgeEndColor,
 				])
+				.interpolate(d3.interpolateRgb)
 
-			const edgeWidthScale = d3.scale
-				.linear()
+			const edgeWidthScale = d3
+				.scaleLinear<number>()
 				.domain(edgeWidthDomain)
-				.interpolate(<any>d3.interpolateNumber)
 				.range([
 					this._configuration.layout.edgeMinWidth,
 					this._configuration.layout.edgeMaxWidth,
@@ -472,7 +477,7 @@ export class NetworkNavigator {
 
 			const xform = (
 				v: number,
-				scale: Function,
+				scale: (v: number) => any,
 				domain: [number, number],
 				defaultValue: any,
 			) => {
@@ -503,35 +508,20 @@ export class NetworkNavigator {
 				.enter()
 				.append('line')
 				.attr('class', 'link')
-				// tslint:disable-next-line
-				.style('stroke', function (d: any) {
-					return xform(
-						d[4],
-						edgeColorScale,
-						edgeColorWeightDomain,
-						'gray',
-					)
-				})
-				// tslint:disable-next-line
-				.style('stroke-width', function (d: any) {
-					return xform(
-						d[3],
-						edgeWidthScale,
-						edgeWidthDomain,
-						DEFAULT_EDGE_SIZE,
-					)
-				})
-				// tslint:disable-next-line
-				.attr('id', function (d: any) {
-					return (
-						d[0].name.replace(/\./g, '_').replace(/@/g, '_') +
-						'_' +
-						d[2].name.replace(/\./g, '_').replace(/@/g, '_')
-					)
-				})
+				.style('stroke', (d: any) =>
+					xform(d[4], edgeColorScale, edgeColorWeightDomain, 'gray'),
+				)
+				.style('stroke-width', (d: any) =>
+					xform(d[3], edgeWidthScale, edgeWidthDomain, DEFAULT_EDGE_SIZE),
+				)
+				.attr('id', (d: any) =>
+					d[0].name.replace(/\./g, '_').replace(/@/g, '_') +
+					'_' +
+					d[2].name.replace(/\./g, '_').replace(/@/g, '_'),
+				)
 
 			const node = this.vis
-				.selectAll('.node')
+				.selectAll<SVGGElement, any>('.node')
 				.data(graph.nodes)
 				.enter()
 				.append('g')
@@ -541,16 +531,13 @@ export class NetworkNavigator {
 			node.append('svg:circle')
 				.attr('r', (d: any) => {
 					let width = d.value
-					// tslint:disable
 					if (typeof width === 'undefined' || width === null) {
-						// tslint:enable
 						width = DEFAULT_NODE_SIZE
 					}
 					const maxSize = this._configuration.layout.maxNodeSize
 					const minSize = this._configuration.layout.minNodeSize
 					width = maxSize && width > maxSize ? maxSize : width
 					width = minSize && width < minSize ? minSize : width
-					// Make sure > 0
 					return width > 0 ? width : 0
 				})
 				.style('fill', (d: any) => d.color)
@@ -558,35 +545,31 @@ export class NetworkNavigator {
 				.style('stroke-width', (d: any) => (d.selected ? 1 : 0))
 				.style('opacity', (d: any) => (d.dimmed ? 0.2 : 1.0))
 
-			node.on('click', (n: INetworkNavigatorNode) =>
+			// D3 v7: event is first argument, datum is second
+			node.on('click', (_event: MouseEvent, n: INetworkNavigatorNode) =>
 				this.updateSelection(n),
 			)
 
-			node.on('mouseover', () => {
-				// tslint:disable
-				d3.select(this.svgContainer.find('svg text')[0]).style(
-					'display',
-					null,
-				)
-				// tslint:enable
+			node.on('mouseover', (_event: MouseEvent, _d: any) => {
+				const firstText = this.svgContainer.querySelector('svg text')
+				if (firstText) {
+					;(firstText as SVGTextElement).style.display = ''
+				}
 			})
-			node.on('mouseout', () => {
+			node.on('mouseout', (_event: MouseEvent, _d: any) => {
 				if (!this._configuration.layout.labels) {
-					d3.select(this.svgContainer.find('svg text')[0]).style(
-						'display',
-						'none',
-					)
+					const firstText = this.svgContainer.querySelector('svg text')
+					if (firstText) {
+						;(firstText as SVGTextElement).style.display = 'none'
+					}
 				}
 			})
 
 			link.append('svg:text')
-				.text((d: any) => 'yes')
+				.text(() => 'yes')
 				.attr('fill', 'black')
 				.attr('stroke', 'black')
-				.attr(
-					'font-size',
-					() => `${this._configuration.layout.fontSizePT}pt`,
-				)
+				.attr('font-size', `${this._configuration.layout.fontSizePT}pt`)
 				.attr('stroke-width', '0.5px')
 				.attr('class', 'linklabel')
 				.attr('text-anchor', 'middle')
@@ -597,48 +580,35 @@ export class NetworkNavigator {
 				.attr(
 					'fill',
 					(d: any) =>
-						d.labelColor ||
-						this._configuration.layout.defaultLabelColor,
+						d.labelColor || this._configuration.layout.defaultLabelColor,
 				)
 				.attr(
 					'stroke',
 					(d: any) =>
-						d.labelColor ||
-						this._configuration.layout.defaultLabelColor,
+						d.labelColor || this._configuration.layout.defaultLabelColor,
 				)
-				.attr(
-					'font-size',
-					() => `${this._configuration.layout.fontSizePT}pt`,
-				)
+				.attr('font-size', `${this._configuration.layout.fontSizePT}pt`)
 				.attr('stroke-width', '0.5px')
 				.style('opacity', (d: any) => (d.dimmed ? 0.2 : 1.0))
-				// tslint:disable
-				.style(
-					'display',
-					this._configuration.layout.labels ? null : 'none',
-				)
-			// tslint:enable
+				.style('display', this._configuration.layout.labels ? null : 'none')
 
-			// If we are not animating, then play the force quickly
 			if (!this._configuration.layout.animate) {
 				this.reflow(link, node)
 			}
 
-			// Our tick function, which actually moves the nodes on the svg based on their x/y positions
+			// Tick function: update SVG positions from simulation node x/y
 			const tick = () => {
 				if (this._configuration.layout.animate) {
-					link.attr('x1', d => d[0].x)
-						.attr('y1', d => d[0].y)
-						.attr('x2', d => d[2].x)
-						.attr('y2', d => d[2].y)
-					node.attr(
-						'transform',
-						(d: any) => `translate(${d.x},${d.y})`,
-					)
+					link.attr('x1', (d: any) => d[0].x)
+						.attr('y1', (d: any) => d[0].y)
+						.attr('x2', (d: any) => d[2].x)
+						.attr('y2', (d: any) => d[2].y)
+					node.attr('transform', (d: any) => `translate(${d.x},${d.y})`)
 				}
 			}
 
-			this.force.on('tick', tick)
+			// D3 v7: 'tick' fires on the simulation object, not the force layout
+			this.simulation.on('tick', tick)
 		}
 	}
 
@@ -647,20 +617,22 @@ export class NetworkNavigator {
 	): any[] {
 		const nodes = graph.nodes.slice()
 		const links: { source: any; target: any }[] = []
-		const bilinks = []
+		const bilinks: any[] = []
 
 		graph.links.forEach(graphLink => {
 			const s = nodes[graphLink.source]
 			const t = nodes[graphLink.target]
 			const w = graphLink.value
 			const cw = graphLink.colorValue
-			const i = {} // intermediate node
-			nodes.push(<any>i)
+			const i: any = {} // intermediate node for bilink curve
+			nodes.push(i)
 			links.push({ source: s, target: i }, { source: i, target: t })
 			bilinks.push([s, i, t, w, cw])
 		})
 
-		this.force.nodes(nodes).links(links)
+		// D3 v7: set nodes on simulation, links on forceLink
+		this.simulation.nodes(nodes)
+		this.forceLink.links(links)
 		return bilinks
 	}
 
@@ -671,17 +643,18 @@ export class NetworkNavigator {
 	}
 
 	private renderZoom() {
-		this.zoom = d3.behavior
-			.zoom()
+		this.zoom = d3
+			.zoom<SVGSVGElement, unknown>()
 			.scaleExtent([
 				this._configuration.layout.minZoom,
 				this._configuration.layout.maxZoom,
 			])
-			.on('zoom', () => {
-				const event = <d3.ZoomEvent>d3.event
-				this.scale = event.scale
-				this.translate = event.translate
-				this.zoomToViewport()
+			.on('zoom', (event: d3.D3ZoomEvent<SVGSVGElement, unknown>) => {
+				this.scale = event.transform.k
+				this.translate = [event.transform.x, event.transform.y]
+				if (this.vis) {
+					this.vis.attr('transform', event.transform.toString())
+				}
 			})
 	}
 
@@ -689,13 +662,18 @@ export class NetworkNavigator {
 	 * Applies the current scale and translate settings to the view.
 	 */
 	private zoomToViewport() {
-		if (this.zoom && this.vis) {
+		if (this.zoom && this.vis && this.svg) {
 			this.vis.attr(
 				'transform',
 				`translate(${this.translate}) scale(${this.scale})`,
 			)
-			this.zoom.scale(this.scale)
-			this.zoom.translate(this.translate)
+			// Sync the zoom behavior's internal transform state
+			this.svg.call(
+				this.zoom.transform,
+				d3.zoomIdentity
+					.translate(this.translate[0], this.translate[1])
+					.scale(this.scale),
+			)
 		}
 	}
 
@@ -752,7 +730,6 @@ export class NetworkNavigator {
 		this.vis
 			.selectAll('.node .node-label')
 			.style('opacity', (d: any) => (d.dimmed ? 0.2 : 1.0))
-		// Also dim edges where both endpoints are dimmed
 		this.vis
 			.selectAll('.link')
 			.style('opacity', (d: any) =>
@@ -769,14 +746,12 @@ export class NetworkNavigator {
 			.attr(
 				'fill',
 				(d: any) =>
-					d.labelColor ||
-					this._configuration.layout.defaultLabelColor,
+					d.labelColor || this._configuration.layout.defaultLabelColor,
 			)
 			.attr(
 				'stroke',
 				(d: any) =>
-					d.labelColor ||
-					this._configuration.layout.defaultLabelColor,
+					d.labelColor || this._configuration.layout.defaultLabelColor,
 			)
 	}
 
@@ -784,19 +759,16 @@ export class NetworkNavigator {
 	 * Filters the nodes to the given string
 	 */
 	public filterNodes(text: string, animate = true) {
-		let temp: d3.Selection<any> | d3.Transition<any> =
-			this.vis.selectAll('.node circle')
+		let temp: any = this.vis.selectAll('.node circle')
 		if (animate) {
 			temp = temp.transition().duration(500).delay(100)
 		}
 		const pretty = (val: string) => (val || '') + ''
 		temp.attr('transform', (d: any) => {
-			// If the node matches the search string, then scale it
 			let scale = 1
 			const searchStr = d.name || ''
 			const flags = this._configuration.search.caseInsensitive ? 'i' : ''
 			const regex = new RegExp(escapeRegExp(text), flags)
-
 			if (text && regex.test(pretty(searchStr))) {
 				scale = 3
 			}
@@ -806,7 +778,6 @@ export class NetworkNavigator {
 
 	/**
 	 * Updates the selection based on the given node
-	 * @param n The node to update selection for
 	 */
 	public updateSelection(n?: INetworkNavigatorNode) {
 		let selectedNode = n
@@ -818,7 +789,7 @@ export class NetworkNavigator {
 				n.selected = true
 			}
 		} else {
-			// Toggle the selected node
+			// Toggle: clicking the already-selected node deselects it
 			if (this._selectedNode) {
 				this._selectedNode.selected = false
 			}
@@ -829,23 +800,23 @@ export class NetworkNavigator {
 	}
 
 	/**
-	 * Reflows the given links and nodes
+	 * Reflows the given links and nodes using manual simulation ticks (no animation timer)
 	 */
-	private reflow(link: d3.Selection<any>, node: d3.Selection<any>) {
-		let k = 0
-		this.force.start()
-		// Alpha measures the amount of movement
-		while (this.force.alpha() > 1e-2 && k < 150) {
-			this.force['tick']()
-			k = k + 1
+	private reflow(
+		link: d3.Selection<any, any, any, any>,
+		node: d3.Selection<any, any, any, any>,
+	) {
+		// Run simulation manually until settled or max iterations reached
+		this.simulation.alpha(1).stop()
+		for (let k = 0; k < 150 && this.simulation.alpha() > 1e-2; k++) {
+			this.simulation.tick()
 		}
-		this.force.stop()
 		this.createConnections(link, node)
 	}
 
 	private createConnections(
-		link: d3.Selection<any>,
-		node: d3.Selection<any>,
+		link: d3.Selection<any, any, any, any>,
+		node: d3.Selection<any, any, any, any>,
 	) {
 		link.attr('x1', (d: any) => d[0].x)
 			.attr('y1', (d: any) => d[0].y)

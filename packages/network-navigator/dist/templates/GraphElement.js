@@ -27,45 +27,29 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GraphElement = void 0;
 /**
- * The template for the network navigator
+ * The template for the network navigator — vanilla DOM, no jQuery
  */
-const $ = require("jquery");
 class GraphElement {
     constructor() {
-        this.element = $(this.template());
+        const div = document.createElement('div');
+        div.innerHTML = `<div class="graph-container"><div class="button-bar"><div class="input-box"><input type="text" autocomplete="off" placeholder="Enter text filter" id="search-filter-box"/><a id="clear-selection"><span class="clear-selection-button"></span></a></div></div><div class="svg-container"></div></div>`;
+        this._root = div.firstElementChild;
     }
     get graphTemplate() {
-        return this.element;
+        return this._root;
     }
     get svgContainer() {
-        return this.element.find('.svg-container');
+        return this._root.querySelector('.svg-container');
     }
     get clearSelection() {
-        return this.element.find('#clear-selection');
+        return this._root.querySelector('#clear-selection');
     }
     get filterBox() {
-        return this.element.find('#search-filter-box');
+        return this._root.querySelector('#search-filter-box');
     }
     get textFilter() {
-        return this.filterBox.val();
-    }
-    template() {
-        return `
-        <div class="graph-container">
-            <div class="button-bar">
-                <div class="input-box">
-                    <input type="text" autocomplete="off" placeholder="Enter text filter" id="search-filter-box"/>
-                    <a id="clear-selection">
-                        <span class="clear-selection-button"></span>
-                    </a>
-                </div>
-            </div>
-            <div class="svg-container">
-            </div>
-        </div>
-    `
-            .trim()
-            .replace(/[\r\n]/g, '');
+        var _a, _b;
+        return (_b = (_a = this.filterBox) === null || _a === void 0 ? void 0 : _a.value) !== null && _b !== void 0 ? _b : '';
     }
 }
 exports.GraphElement = GraphElement;

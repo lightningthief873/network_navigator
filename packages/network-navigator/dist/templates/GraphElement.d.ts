@@ -1,12 +1,12 @@
-/// <reference types="jquery" />
-/// <reference types="jquery" />
+/**
+ * The template for the network navigator — vanilla DOM, no jQuery
+ */
 export declare class GraphElement {
-    private element;
+    private _root;
     constructor();
-    get graphTemplate(): JQuery;
-    get svgContainer(): JQuery;
-    get clearSelection(): JQuery;
-    get filterBox(): JQuery<HTMLElement>;
+    get graphTemplate(): HTMLElement;
+    get svgContainer(): HTMLElement;
+    get clearSelection(): HTMLElement;
+    get filterBox(): HTMLInputElement;
     get textFilter(): string;
-    private template;
 }
