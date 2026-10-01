@@ -126,6 +126,16 @@ Non-matching nodes and their labels drop to **20% opacity**. Edges between two f
 
 ## Upgrade History
 
+### v3.1.0.0 — This fork, UX polish
+
+**Label visibility, clear-selection button, and stray-text fix:**
+- **Labels on by default** — `labels: true`, black (`#000000`), 10pt (matching the 14px search box font). Previously labels were off and blue.
+- **"Clear Selection" button** — dedicated button below the search bar that deselects the active node and lifts the cross-filter on other visuals. The `×` inside the search box now only clears the text filter.
+- **Removed stray "yes" text** — leftover `link.append('svg:text').text('yes')` code was appending `<text>` as children of `<line>` SVG elements (invalid SVG), causing browsers to render them stacked at (0,0) — the top of the visual.
+- **Fixed hover-label behavior** — mouseover/mouseout now shows/hides the label of the specific hovered node (not just the first text element in the SVG).
+- **Node label font** — `Segoe UI` / system-ui (matches the search box) via `.node-label` CSS class.
+- **Label stroke removed** — previously both fill and stroke were set to the label color, making text look slightly blurry at small sizes. Now only fill is used.
+
 ### Original v3.0.0 — Microsoft (deprecated)
 - D3 v3.5.12 force-directed graph
 - jQuery-based DOM manipulation

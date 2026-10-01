@@ -131,3 +131,34 @@ body {
 #search-filter-box:focus-visible {
 	outline: unset;
 }
+
+.clear-selection-btn {
+	display: block;
+	width: 100%;
+	margin-top: 4px;
+	padding: 3px 8px;
+	font-size: 12px;
+	font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+	color: #323130;
+	background: #ffffff;
+	border: 1px solid #8a8886;
+	border-radius: 2px;
+	cursor: pointer;
+	text-align: center;
+	box-sizing: border-box;
+
+	&:hover {
+		background: #f3f2f1;
+		border-color: #605e5c;
+	}
+
+	&:active {
+		background: #edebe9;
+	}
+}
+
+/* Node labels in the SVG — match Segoe UI used by the search box */
+.node-label {
+	font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+	font-weight: 400;
+}

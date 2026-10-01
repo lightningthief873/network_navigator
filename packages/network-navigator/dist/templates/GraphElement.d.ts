@@ -6,7 +6,10 @@ export declare class GraphElement {
     constructor();
     get graphTemplate(): HTMLElement;
     get svgContainer(): HTMLElement;
+    /** The × icon that clears the text filter */
     get clearSelection(): HTMLElement;
+    /** The "Clear Selection" button below the search bar */
+    get clearSelectionBtn(): HTMLElement;
     get filterBox(): HTMLInputElement;
     get textFilter(): string;
 }

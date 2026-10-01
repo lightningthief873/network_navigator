@@ -32,7 +32,7 @@ export class GraphElement {
 
 	constructor() {
 		const div = document.createElement('div')
-		div.innerHTML = `<div class="graph-container"><div class="button-bar"><div class="input-box"><input type="text" autocomplete="off" placeholder="Enter text filter" id="search-filter-box"/><a id="clear-selection"><span class="clear-selection-button"></span></a></div></div><div class="svg-container"></div></div>`
+		div.innerHTML = `<div class="graph-container"><div class="button-bar"><div class="input-box"><input type="text" autocomplete="off" placeholder="Enter text filter" id="search-filter-box"/><a id="clear-text-btn"><span class="clear-selection-button"></span></a></div><button id="clear-selection-btn" class="clear-selection-btn">Clear Selection</button></div><div class="svg-container"></div></div>`
 		this._root = div.firstElementChild as HTMLElement
 	}
 
@@ -44,8 +44,14 @@ export class GraphElement {
 		return this._root.querySelector('.svg-container') as HTMLElement
 	}
 
+	/** The × icon that clears the text filter */
 	public get clearSelection(): HTMLElement {
-		return this._root.querySelector('#clear-selection') as HTMLElement
+		return this._root.querySelector('#clear-text-btn') as HTMLElement
+	}
+
+	/** The "Clear Selection" button below the search bar */
+	public get clearSelectionBtn(): HTMLElement {
+		return this._root.querySelector('#clear-selection-btn') as HTMLElement
 	}
 
 	public get filterBox(): HTMLInputElement {

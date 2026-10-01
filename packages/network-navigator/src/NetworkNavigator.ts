@@ -138,8 +138,14 @@ export class NetworkNavigator {
 		element.appendChild(this.element.graphTemplate)
 
 		this.svgContainer = this.element.svgContainer
+
+		// × inside the search box: clear text filter only
 		this.element.clearSelection.addEventListener('click', () => {
 			this.textFilter = ''
+		})
+
+		// "Clear Selection" button below the search box: deselect node and lift cross-filter
+		this.element.clearSelectionBtn.addEventListener('click', () => {
 			this.updateSelection(undefined)
 		})
 
@@ -554,29 +560,15 @@ export class NetworkNavigator {
 				this.updateSelection(n),
 			)
 
-			node.on('mouseover', (_event: MouseEvent, _d: any) => {
-				const firstText = this.svgContainer.querySelector('svg text')
-				if (firstText) {
-					;(firstText as SVGTextElement).style.display = ''
+			// When labels are off: show the hovered node's label, hide on mouseout
+			node.on('mouseover', function() {
+				d3.select(this).select('text').style('display', '')
+			})
+			node.on('mouseout', function() {
+				if (!me._configuration.layout.labels) {
+					d3.select(this).select('text').style('display', 'none')
 				}
 			})
-			node.on('mouseout', (_event: MouseEvent, _d: any) => {
-				if (!this._configuration.layout.labels) {
-					const firstText = this.svgContainer.querySelector('svg text')
-					if (firstText) {
-						;(firstText as SVGTextElement).style.display = 'none'
-					}
-				}
-			})
-
-			link.append('svg:text')
-				.text(() => 'yes')
-				.attr('fill', 'black')
-				.attr('stroke', 'black')
-				.attr('font-size', `${this._configuration.layout.fontSizePT}pt`)
-				.attr('stroke-width', '0.5px')
-				.attr('class', 'linklabel')
-				.attr('text-anchor', 'middle')
 
 			node.append('svg:text')
 				.attr('class', 'node-label')
@@ -586,13 +578,7 @@ export class NetworkNavigator {
 					(d: any) =>
 						d.labelColor || this._configuration.layout.defaultLabelColor,
 				)
-				.attr(
-					'stroke',
-					(d: any) =>
-						d.labelColor || this._configuration.layout.defaultLabelColor,
-				)
 				.attr('font-size', `${this._configuration.layout.fontSizePT}pt`)
-				.attr('stroke-width', '0.5px')
 				.style('opacity', (d: any) => (d.dimmed ? 0.2 : 1.0))
 				.style('display', this._configuration.layout.labels ? null : 'none')
 

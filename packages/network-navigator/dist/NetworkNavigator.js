@@ -61,8 +61,12 @@ class NetworkNavigator {
         this.element = new GraphElement_1.GraphElement();
         element.appendChild(this.element.graphTemplate);
         this.svgContainer = this.element.svgContainer;
+        // × inside the search box: clear text filter only
         this.element.clearSelection.addEventListener('click', () => {
             this.textFilter = '';
+        });
+        // "Clear Selection" button below the search box: deselect node and lift cross-filter
+        this.element.clearSelectionBtn.addEventListener('click', () => {
             this.updateSelection(undefined);
         });
         const handleTextInput = (0, debounce_1.default)(() => {
@@ -75,10 +79,14 @@ class NetworkNavigator {
             .append('svg')
             .attr('width', width)
             .attr('height', height);
+        // forceLink is stored separately from the simulation so we can call
+        // forceLink.links([]) and forceLink.distance/strength without recreating it.
         this.forceLink = d3
             .forceLink()
             .distance(10)
             .strength(2);
+        // Simulation is stopped immediately — renderGraph starts it (animated mode)
+        // or drives it manually via tick() (static mode).
         this.simulation = d3
             .forceSimulation()
             .force('link', this.forceLink)
@@ -380,37 +388,20 @@ class NetworkNavigator {
                 .style('opacity', (d) => (d.dimmed ? 0.2 : 1.0));
             // D3 v7: event is first argument, datum is second
             node.on('click', (_event, n) => this.updateSelection(n));
-            node.on('mouseover', (_event, _d) => {
-                const firstText = this.svgContainer.querySelector('svg text');
-                if (firstText) {
-                    ;
-                    firstText.style.display = '';
+            // When labels are off: show the hovered node's label, hide on mouseout
+            node.on('mouseover', function () {
+                d3.select(this).select('text').style('display', '');
+            });
+            node.on('mouseout', function () {
+                if (!me._configuration.layout.labels) {
+                    d3.select(this).select('text').style('display', 'none');
                 }
             });
-            node.on('mouseout', (_event, _d) => {
-                if (!this._configuration.layout.labels) {
-                    const firstText = this.svgContainer.querySelector('svg text');
-                    if (firstText) {
-                        ;
-                        firstText.style.display = 'none';
-                    }
-                }
-            });
-            link.append('svg:text')
-                .text(() => 'yes')
-                .attr('fill', 'black')
-                .attr('stroke', 'black')
-                .attr('font-size', `${this._configuration.layout.fontSizePT}pt`)
-                .attr('stroke-width', '0.5px')
-                .attr('class', 'linklabel')
-                .attr('text-anchor', 'middle');
             node.append('svg:text')
                 .attr('class', 'node-label')
                 .text((d) => d.name)
                 .attr('fill', (d) => d.labelColor || this._configuration.layout.defaultLabelColor)
-                .attr('stroke', (d) => d.labelColor || this._configuration.layout.defaultLabelColor)
                 .attr('font-size', `${this._configuration.layout.fontSizePT}pt`)
-                .attr('stroke-width', '0.5px')
                 .style('opacity', (d) => (d.dimmed ? 0.2 : 1.0))
                 .style('display', this._configuration.layout.labels ? null : 'none');
             if (!this._configuration.layout.animate) {
@@ -434,12 +425,17 @@ class NetworkNavigator {
         const nodes = graph.nodes.slice();
         const links = [];
         const bilinks = [];
+        // Bilink technique: for each logical edge s→t we insert a hidden intermediate
+        // node `i` and two real force links: s→i and i→t. The SVG line is drawn
+        // from s to t using i's position as an invisible midpoint anchor. This lets
+        // parallel edges between the same two nodes curve without overlapping.
+        // bilinks[k] = [sourceNode, intermediateNode, targetNode, edgeWidth, edgeColor]
         graph.links.forEach(graphLink => {
             const s = nodes[graphLink.source];
             const t = nodes[graphLink.target];
             const w = graphLink.value;
             const cw = graphLink.colorValue;
-            const i = {}; // intermediate node for bilink curve
+            const i = {};
             nodes.push(i);
             links.push({ source: s, target: i }, { source: i, target: t });
             bilinks.push([s, i, t, w, cw]);
@@ -455,6 +451,8 @@ class NetworkNavigator {
         this.zoomToViewport();
     }
     renderZoom() {
+        // event.transform.k = scale, event.transform.x/y = translate.
+        // We store scale/translate so zoomToViewport() can restore them after a redraw.
         this.zoom = d3
             .zoom()
             .scaleExtent([
@@ -475,7 +473,10 @@ class NetworkNavigator {
     zoomToViewport() {
         if (this.zoom && this.vis && this.svg) {
             this.vis.attr('transform', `translate(${this.translate}) scale(${this.scale})`);
-            // Sync the zoom behavior's internal transform state
+            // In D3 v7, zoom.transform() is how you programmatically set the zoom
+            // state. Calling it syncs the behavior's internal __zoom property on the
+            // SVG element so that subsequent user gestures start from the right baseline
+            // rather than snapping back to identity.
             this.svg.call(this.zoom.transform, d3.zoomIdentity
                 .translate(this.translate[0], this.translate[1])
                 .scale(this.scale));
@@ -591,7 +592,10 @@ class NetworkNavigator {
      * Reflows the given links and nodes using manual simulation ticks (no animation timer)
      */
     reflow(link, node) {
-        // Run simulation manually until settled or max iterations reached
+        // Static (non-animated) layout: advance the simulation synchronously instead
+        // of letting the internal timer run. alpha() decays each tick; we stop early
+        // if it drops below 0.01 (essentially converged). 150 iterations is a safe
+        // upper bound for typical graph sizes.
         this.simulation.alpha(1).stop();
         for (let k = 0; k < 150 && this.simulation.alpha() > 1e-2; k++) {
             this.simulation.tick();

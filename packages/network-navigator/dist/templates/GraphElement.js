@@ -32,7 +32,7 @@ exports.GraphElement = void 0;
 class GraphElement {
     constructor() {
         const div = document.createElement('div');
-        div.innerHTML = `<div class="graph-container"><div class="button-bar"><div class="input-box"><input type="text" autocomplete="off" placeholder="Enter text filter" id="search-filter-box"/><a id="clear-selection"><span class="clear-selection-button"></span></a></div></div><div class="svg-container"></div></div>`;
+        div.innerHTML = `<div class="graph-container"><div class="button-bar"><div class="input-box"><input type="text" autocomplete="off" placeholder="Enter text filter" id="search-filter-box"/><a id="clear-text-btn"><span class="clear-selection-button"></span></a></div><button id="clear-selection-btn" class="clear-selection-btn">Clear Selection</button></div><div class="svg-container"></div></div>`;
         this._root = div.firstElementChild;
     }
     get graphTemplate() {
@@ -41,8 +41,13 @@ class GraphElement {
     get svgContainer() {
         return this._root.querySelector('.svg-container');
     }
+    /** The × icon that clears the text filter */
     get clearSelection() {
-        return this._root.querySelector('#clear-selection');
+        return this._root.querySelector('#clear-text-btn');
+    }
+    /** The "Clear Selection" button below the search bar */
+    get clearSelectionBtn() {
+        return this._root.querySelector('#clear-selection-btn');
     }
     get filterBox() {
         return this._root.querySelector('#search-filter-box');
