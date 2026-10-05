@@ -393,6 +393,14 @@ export class Visual implements IVisual {
 					filterInput.addEventListener(evt, e => e.stopPropagation())
 				})
 			}
+
+			// Prevent Power BI from intercepting clicks on the Clear Selection button
+			const clearBtn = this.target.querySelector('#clear-selection-btn')
+			if (clearBtn) {
+				EVENTS_TO_IGNORE.split(' ').forEach(evt => {
+					clearBtn.addEventListener(evt, e => e.stopPropagation())
+				})
+			}
 		}
 	}
 }
