@@ -23,6 +23,12 @@
 			"kind": "GroupingOrMeasure"
 		},
 		{
+			"name": "EDGE_DIRECT_COLOR",
+			"displayName": "Edge Color (Direct)",
+			"description": "A color string (e.g. '#FF0000') applied directly to each edge, overriding the gradient when present",
+			"kind": "GroupingOrMeasure"
+		},
+		{
 			"name": "SOURCE_NODE_WEIGHT",
 			"displayName": "Source Node Weight",
 			"kind": "GroupingOrMeasure"
@@ -90,6 +96,11 @@
 						},
 						{
 							"bind": {
+								"to": "EDGE_DIRECT_COLOR"
+							}
+						},
+						{
+							"bind": {
 								"to": "SOURCE_NODE_WEIGHT"
 							}
 						},
@@ -141,6 +152,10 @@
 						"max": 1
 					},
 					"EDGE_COLOR_VALUE": {
+						"min": 0,
+						"max": 1
+					},
+					"EDGE_DIRECT_COLOR": {
 						"min": 0,
 						"max": 1
 					},

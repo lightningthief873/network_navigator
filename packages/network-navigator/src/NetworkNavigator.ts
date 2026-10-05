@@ -519,7 +519,8 @@ export class NetworkNavigator {
 				.append('line')
 				.attr('class', 'link')
 				.style('stroke', (d: any) =>
-					xform(d[4], edgeColorScale, edgeColorWeightDomain, 'gray'),
+					// d[5] is a direct CSS color string — use it if present, else fall back to gradient
+					d[5] || xform(d[4], edgeColorScale, edgeColorWeightDomain, 'gray'),
 				)
 				.style('stroke-width', (d: any) =>
 					xform(d[3], edgeWidthScale, edgeWidthDomain, DEFAULT_EDGE_SIZE),
@@ -619,10 +620,12 @@ export class NetworkNavigator {
 			const t = nodes[graphLink.target]
 			const w = graphLink.value
 			const cw = graphLink.colorValue
+			const dc = graphLink.directColor
 			const i: any = {}
 			nodes.push(i)
 			links.push({ source: s, target: i }, { source: i, target: t })
-			bilinks.push([s, i, t, w, cw])
+			// bilinks[k] = [sourceNode, intermediateNode, targetNode, edgeWidth, edgeColorWeight, directColor]
+			bilinks.push([s, i, t, w, cw, dc])
 		})
 
 		// D3 v7: set nodes on simulation, links on forceLink

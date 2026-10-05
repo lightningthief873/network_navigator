@@ -60,6 +60,7 @@ function converter(
 	const targetIdx = colMap[roles.target.name]
 	const edgeValueIdx = colMap[roles.edgeValue.name]
 	const edgeColorValueIdx = colMap[roles.edgeColorValue.name]
+	const edgeDirectColorIdx = colMap[roles.edgeDirectColor.name]
 	const sourceNodeWeightIdx = colMap[roles.sourceNodeWeight.name]
 	const targetNodeWeightIdx = colMap[roles.targetNodeWeight.name]
 
@@ -159,6 +160,7 @@ function converter(
 					target: targetNode.index,
 					value: row[edgeValueIdx],
 					colorValue: row[edgeColorValueIdx],
+					directColor: edgeDirectColorIdx !== undefined ? <string>row[edgeDirectColorIdx] : undefined,
 				}
 				nodeList[edge.source].neighbors += 1
 				nodeList[edge.target].neighbors += 1

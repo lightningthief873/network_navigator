@@ -97,6 +97,14 @@ export const DATA_ROLES = {
 	},
 
 	/**
+	 * A direct CSS color string for each edge (overrides the gradient when present)
+	 */
+	edgeDirectColor: {
+		displayName: 'Edge Color (Direct)',
+		name: 'EDGE_DIRECT_COLOR',
+	},
+
+	/**
 	 * The filter field
 	 */
 	filterField: {

@@ -83,6 +83,12 @@ export interface INetworkNavigatorLink {
 	 * The value of the link, used to weight the link color
 	 */
 	colorValue?: number
+
+	/**
+	 * A direct CSS color string for this edge (e.g. "#FF0000", "red").
+	 * When present, overrides the numeric colorValue gradient for this edge.
+	 */
+	directColor?: string
 }
 
 /**
