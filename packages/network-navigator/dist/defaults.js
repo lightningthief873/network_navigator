@@ -41,7 +41,7 @@ exports.DEFAULT_CONFIGURATION = {
     animate: true,
     linkDistance: 10,
     linkStrength: 2,
-    charge: -120,
+    charge: -100,
     gravity: 0.1,
     labels: true,
     minZoom: 0.1,
