@@ -42,7 +42,7 @@ export const DEFAULT_ZOOM_TRANSLATE: [number, number] = [0, 0]
  * The default configuration used with network navigator
  */
 export const DEFAULT_CONFIGURATION: INetworkNavigatorConfiguration = {
-	animate: false,
+	animate: true,
 	linkDistance: 10,
 	linkStrength: 2,
 	charge: -120,

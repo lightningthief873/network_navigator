@@ -4,7 +4,7 @@
 		"displayName": "Network Navigator Pro",
 		"visualClassName": "Visual",
 		"guid": "NetworkNavigatorPro2026100600001",
-		"version": "3.2.3.0",
+		"version": "3.2.4.0",
 		"description": "Force-directed network graph with bi-directional cross-filtering, node labels, edge color mapping, and clear-selection support. Fork of Microsoft Network Navigator — D3 v7, PowerBI API v5, no jQuery.",
 		"supportUrl": "https://github.com/lightningthief873/network_navigator",
 		"gitHubUrl": "https://github.com/lightningthief873/network_navigator"

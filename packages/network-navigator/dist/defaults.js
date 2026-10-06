@@ -38,7 +38,7 @@ exports.DEFAULT_ZOOM_TRANSLATE = [0, 0];
  * The default configuration used with network navigator
  */
 exports.DEFAULT_CONFIGURATION = {
-    animate: false,
+    animate: true,
     linkDistance: 10,
     linkStrength: 2,
     charge: -120,

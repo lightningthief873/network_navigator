@@ -93,10 +93,10 @@ class NetworkNavigator {
         this.simulation = d3
             .forceSimulation()
             .force('link', this.forceLink)
-            // distanceMax caps repulsion range: nodes >200px apart don't push each other.
-            // This keeps intra-cluster spacing (charge -120) while preventing distant
-            // clusters from repelling each other across the canvas.
-            .force('charge', d3.forceManyBody().strength(-120).distanceMax(200))
+            // distanceMax caps repulsion range: nodes >600px apart don't push each other.
+            // This keeps intra-cluster spacing (charge -120) while preventing clusters
+            // near the canvas edges from repelling each other off-screen.
+            .force('charge', d3.forceManyBody().strength(-120).distanceMax(600))
             .force('x', d3.forceX(width / 2).strength(0.1))
             .force('y', d3.forceY(height / 2).strength(0.1))
             .stop();
@@ -182,7 +182,7 @@ class NetworkNavigator {
             // Update charge (preserve distanceMax so clusters don't repel across canvas)
             if (updateForceConfig('layout', 'charge', defaults_1.charge)) {
                 ;
-                (_a = this.simulation.force('charge')) === null || _a === void 0 ? void 0 : _a.strength(newConfig.layout.charge).distanceMax(200);
+                (_a = this.simulation.force('charge')) === null || _a === void 0 ? void 0 : _a.strength(newConfig.layout.charge).distanceMax(600);
                 runStart = true;
             }
             // Update gravity (forceX/forceY strength — per-node pull toward center)
