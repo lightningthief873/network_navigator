@@ -45,7 +45,7 @@ export const DEFAULT_CONFIGURATION: INetworkNavigatorConfiguration = {
 	animate: false,
 	linkDistance: 10,
 	linkStrength: 2,
-	charge: -30,
+	charge: -120,
 	gravity: 0.1,
 	labels: true,
 	minZoom: 0.1,
