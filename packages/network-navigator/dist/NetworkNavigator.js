@@ -87,11 +87,15 @@ class NetworkNavigator {
             .strength(2);
         // Simulation is stopped immediately — renderGraph starts it (animated mode)
         // or drives it manually via tick() (static mode).
+        // forceX/forceY give each node a per-node radial pull toward the viewport
+        // center — the D3 v7 equivalent of D3 v3's gravity parameter. forceCenter
+        // (D3 v7) only translates the global mean and does NOT keep clusters in place.
         this.simulation = d3
             .forceSimulation()
             .force('link', this.forceLink)
-            .force('charge', d3.forceManyBody().strength(-120))
-            .force('center', d3.forceCenter(width / 2, height / 2))
+            .force('charge', d3.forceManyBody().strength(-30))
+            .force('x', d3.forceX(width / 2).strength(0.1))
+            .force('y', d3.forceY(height / 2).strength(0.1))
             .stop();
         this.vis = this.svg.append('svg:g');
         this.redraw();
@@ -115,14 +119,15 @@ class NetworkNavigator {
      * Setter for the dimensions
      */
     set dimensions(newDimensions) {
-        var _a;
+        var _a, _b;
         this._dimensions = {
             width: (newDimensions === null || newDimensions === void 0 ? void 0 : newDimensions.width) || this.dimensions.width,
             height: (newDimensions === null || newDimensions === void 0 ? void 0 : newDimensions.height) || this.dimensions.height,
         };
         if (this.simulation) {
             const { width, height } = this._dimensions;
-            (_a = this.simulation.force('center')) === null || _a === void 0 ? void 0 : _a.x(width / 2).y(height / 2);
+            (_a = this.simulation.force('x')) === null || _a === void 0 ? void 0 : _a.x(width / 2);
+            (_b = this.simulation.force('y')) === null || _b === void 0 ? void 0 : _b.y(height / 2);
             const style = (el) => {
                 el.style.width = `${width}px`;
                 el.style.height = `${height}px`;
@@ -142,7 +147,7 @@ class NetworkNavigator {
      * Setter for the configuration
      */
     set configuration(newConfig) {
-        var _a, _b, _c;
+        var _a, _b, _c, _d;
         if (this.simulation) {
             let runStart = false;
             const getRangeValue = (settingName, name, config) => {
@@ -177,10 +182,11 @@ class NetworkNavigator {
                 (_a = this.simulation.force('charge')) === null || _a === void 0 ? void 0 : _a.strength(newConfig.layout.charge);
                 runStart = true;
             }
-            // Update gravity (forceCenter strength)
+            // Update gravity (forceX/forceY strength — per-node pull toward center)
             if (updateForceConfig('layout', 'gravity', defaults_1.gravity)) {
                 ;
-                (_b = this.simulation.force('center')) === null || _b === void 0 ? void 0 : _b.strength(newConfig.layout.gravity);
+                (_b = this.simulation.force('x')) === null || _b === void 0 ? void 0 : _b.strength(newConfig.layout.gravity);
+                (_c = this.simulation.force('y')) === null || _c === void 0 ? void 0 : _c.strength(newConfig.layout.gravity);
                 runStart = true;
             }
             // Update zoom extents
@@ -221,7 +227,7 @@ class NetworkNavigator {
             }
             if (newConfig.search.caseInsensitive !==
                 this._configuration.search.caseInsensitive) {
-                this.filterNodes((_c = this.element.filterBox.value) !== null && _c !== void 0 ? _c : '');
+                this.filterNodes((_d = this.element.filterBox.value) !== null && _d !== void 0 ? _d : '');
             }
             if (newConfig.layout.fontSizePT !== this._configuration.layout.fontSizePT) {
                 newConfig.layout.fontSizePT = newConfig.layout.fontSizePT || 8;
@@ -546,8 +552,7 @@ class NetworkNavigator {
     redrawLabels() {
         this.vis
             .selectAll('.node .node-label')
-            .attr('fill', (d) => d.labelColor || this._configuration.layout.defaultLabelColor)
-            .attr('stroke', (d) => d.labelColor || this._configuration.layout.defaultLabelColor);
+            .attr('fill', (d) => d.labelColor || this._configuration.layout.defaultLabelColor);
     }
     /**
      * Filters the nodes to the given string

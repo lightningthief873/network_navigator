@@ -171,11 +171,15 @@ export class NetworkNavigator {
 
 		// Simulation is stopped immediately — renderGraph starts it (animated mode)
 		// or drives it manually via tick() (static mode).
+		// forceX/forceY give each node a per-node radial pull toward the viewport
+		// center — the D3 v7 equivalent of D3 v3's gravity parameter. forceCenter
+		// (D3 v7) only translates the global mean and does NOT keep clusters in place.
 		this.simulation = d3
 			.forceSimulation<any>()
 			.force('link', this.forceLink)
-			.force('charge', d3.forceManyBody<any>().strength(-120))
-			.force('center', d3.forceCenter<any>(width / 2, height / 2))
+			.force('charge', d3.forceManyBody<any>().strength(-30))
+			.force('x', d3.forceX<any>(width / 2).strength(0.1))
+			.force('y', d3.forceY<any>(height / 2).strength(0.1))
 			.stop()
 
 		this.vis = this.svg.append('svg:g')
@@ -210,9 +214,8 @@ export class NetworkNavigator {
 
 		if (this.simulation) {
 			const { width, height } = this._dimensions
-			;(this.simulation.force('center') as d3.ForceCenter<any>)
-				?.x(width / 2)
-				.y(height / 2)
+			;(this.simulation.force('x') as d3.ForceX<any>)?.x(width / 2)
+			;(this.simulation.force('y') as d3.ForceY<any>)?.y(height / 2)
 
 			const style = (el: HTMLElement) => {
 				el.style.width = `${width}px`
@@ -285,9 +288,12 @@ export class NetworkNavigator {
 				)
 				runStart = true
 			}
-			// Update gravity (forceCenter strength)
+			// Update gravity (forceX/forceY strength — per-node pull toward center)
 			if (updateForceConfig('layout', 'gravity', gravity)) {
-				;(this.simulation.force('center') as d3.ForceCenter<any>)?.strength(
+				;(this.simulation.force('x') as d3.ForceX<any>)?.strength(
+					newConfig.layout.gravity,
+				)
+				;(this.simulation.force('y') as d3.ForceY<any>)?.strength(
 					newConfig.layout.gravity,
 				)
 				runStart = true
@@ -748,11 +754,6 @@ export class NetworkNavigator {
 			.selectAll('.node .node-label')
 			.attr(
 				'fill',
-				(d: any) =>
-					d.labelColor || this._configuration.layout.defaultLabelColor,
-			)
-			.attr(
-				'stroke',
 				(d: any) =>
 					d.labelColor || this._configuration.layout.defaultLabelColor,
 			)
