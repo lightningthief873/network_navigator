@@ -1,18 +1,18 @@
 {
 	"visual": {
-		"name": "NetworkNavigator",
-		"displayName": "Network Navigator",
+		"name": "NetworkNavigatorPro",
+		"displayName": "Network Navigator Pro",
 		"visualClassName": "Visual",
-		"guid": "NetworkNavigator1550434005853",
+		"guid": "NetworkNavigatorPro2026100600001",
 		"version": "3.2.0.0",
-		"description": "This visual is experimental and not actively being developed, only major issues will be addressed. Network Navigator lets you explore node-link data by panning over and zooming into a force-directed node layout (which can be precomputed or animated live). From an initial overview of all nodes, you can use simple text search to enlarge matching nodes in ways that guide subsequent navigation. Network nodes can also be color-coded based on additional attributes of the dataset and filtered by linked visuals.",
-		"supportUrl": "https://github.com/Microsoft/PowerBI-visuals-NetworkNavigator",
-		"gitHubUrl": "https://github.com/Microsoft/PowerBI-visuals-NetworkNavigator"
+		"description": "Force-directed network graph with bi-directional cross-filtering, node labels, edge color mapping, and clear-selection support. Fork of Microsoft Network Navigator — D3 v7, PowerBI API v5, no jQuery.",
+		"supportUrl": "https://github.com/lightningthief873/network_navigator",
+		"gitHubUrl": "https://github.com/lightningthief873/network_navigator"
 	},
 	"apiVersion": "5.11.1",
 	"author": {
-		"name": "Microsoft",
-		"email": "msrvizsupport@microsoft.com"
+		"name": "lightningthief873",
+		"email": "atharav.jadhav873@gmail.com"
 	},
 	"assets": {
 		"icon": "assets/icon.svg",
